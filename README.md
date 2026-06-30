@@ -4,10 +4,10 @@ Website planejado: `www.focoinvest.com.br`
 
 ## Versão atual
 
-**v1.53.1 — Correção da etapa CVM no GitHub Actions**
+**v1.53.2 — Correção da etapa CVM no GitHub Actions**
 
 
-## Correção v1.53.1
+## Correção v1.53.2
 
 - Corrige erro `NameError: name 'choose_frame' is not defined` no script `scripts/update_cvm_companies.py`.
 - Ajusta o modo `cvm` do workflow para considerar também `anos_itr`.

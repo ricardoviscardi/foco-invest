@@ -13,7 +13,7 @@ Exemplos:
 """
 from __future__ import annotations
 
-import argparse, io, math, re, unicodedata, zipfile
+import argparse, io, math, os, re, time, unicodedata, zipfile
 from datetime import date, datetime, timezone
 from difflib import SequenceMatcher
 from typing import Any
@@ -28,6 +28,9 @@ from tickers import STOCK_TICKERS
 CVM_CAD_URL = "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
 DFP_URL_TEMPLATE = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/DFP/DADOS/dfp_cia_aberta_{year}.zip"
 ITR_URL_TEMPLATE = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/ITR/DADOS/itr_cia_aberta_{year}.zip"
+
+CVM_RETRY_ATTEMPTS = int(os.environ.get("CVM_RETRY_ATTEMPTS", "6"))
+CVM_RETRY_BASE_SLEEP = float(os.environ.get("CVM_RETRY_BASE_SLEEP", "10"))
 
 TICKER_HINTS: dict[str, list[str]] = {
     "ABEV3":["AMBEV"], "PETR3":["PETROLEO BRASILEIRO","PETROBRAS"], "PETR4":["PETROLEO BRASILEIRO","PETROBRAS"],
@@ -77,8 +80,45 @@ def default_years() -> list[int]:
     y=date.today().year
     return [y-1,y-2,y-3,y-4,y-5]
 
+def cvm_get(url: str, *, timeout: int = 120, attempts: int = CVM_RETRY_ATTEMPTS) -> requests.Response | None:
+    """Baixa uma URL da CVM com novas tentativas.
+
+    A CVM/GitHub Actions pode falhar temporariamente com erros como
+    `Network is unreachable`. Uma falha isolada não deve derrubar toda a
+    atualização sem antes tentar novamente.
+    """
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            response = requests.get(url, timeout=timeout)
+            if response.status_code == 404:
+                print({"warning": "cvm_url_not_found", "url": url, "status_code": response.status_code})
+                return None
+            response.raise_for_status()
+            return response
+        except requests.RequestException as exc:
+            last_error = exc
+            wait_seconds = min(CVM_RETRY_BASE_SLEEP * attempt, 60)
+            print({
+                "warning": "cvm_download_retry",
+                "attempt": attempt,
+                "attempts": attempts,
+                "wait_seconds": wait_seconds if attempt < attempts else 0,
+                "url": url,
+                "error": str(exc),
+            })
+            if attempt < attempts:
+                time.sleep(wait_seconds)
+
+    raise RuntimeError(
+        f"Não foi possível acessar a CVM após {attempts} tentativas: {url}. "
+        f"Último erro: {last_error}"
+    ) from last_error
+
 def read_csv_url(url: str) -> pd.DataFrame:
-    r=requests.get(url,timeout=90); r.raise_for_status()
+    r = cvm_get(url, timeout=120)
+    if r is None:
+        raise FileNotFoundError(f"Arquivo CVM não encontrado: {url}")
     return pd.read_csv(io.BytesIO(r.content), sep=";", encoding="latin1", dtype=str)
 
 def read_cad() -> pd.DataFrame:
@@ -149,10 +189,13 @@ def upsert_cad(client: SupabaseRestClient, asset: dict[str,Any], match: dict[str
 
 def get_zip(url: str) -> zipfile.ZipFile|None:
     try:
-        r=requests.get(url,timeout=120)
-        if r.status_code!=200: return None
+        r = cvm_get(url, timeout=180)
+        if r is None:
+            return None
         return zipfile.ZipFile(io.BytesIO(r.content))
-    except Exception: return None
+    except Exception as exc:
+        print({"warning":"cvm_zip_failed","url":url,"error":str(exc)})
+        return None
 
 def member(zf: zipfile.ZipFile, parts: list[str]) -> str|None:
     for name in zf.namelist():
