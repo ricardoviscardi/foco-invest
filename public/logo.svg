@@ -1,0 +1,5 @@
+<svg width="160" height="40" viewBox="0 0 160 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="40" height="40" rx="12" fill="#1E3A8A"/>
+  <path d="M12 27V13H28V16.2H15.8V19.1H26.4V22.2H15.8V27H12Z" fill="white"/>
+  <text x="52" y="26" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700" fill="#1F2937">Foco Invest</text>
+</svg>

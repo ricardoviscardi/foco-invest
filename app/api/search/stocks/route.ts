@@ -1,0 +1,65 @@
+import { NextResponse } from "next/server";
+import { searchBrapiStocks, type StockSearchResult } from "@/lib/stocks/brapi-client";
+import { getCachedValue, setCachedValue } from "@/lib/stocks/api-cache";
+import { stockSuggestionsFallback } from "@/lib/stocks/stock-list";
+import { searchSupabaseAssets } from "@/lib/stocks/supabase-stock-repository";
+
+const SEARCH_CACHE_TTL_MS = 60 * 60 * 1000;
+const SEARCH_STALE_TTL_MS = 12 * 60 * 60 * 1000;
+
+function normalizeQuery(value: string): string {
+  return value.trim().toUpperCase().replace(/[^A-Z0-9 ]/g, "");
+}
+
+function fallbackSearch(query: string): StockSearchResult[] {
+  return stockSuggestionsFallback
+    .filter((item) => {
+      const searchable = `${item.symbol} ${item.name} ${item.sector ?? ""}`.toUpperCase();
+      return searchable.includes(query);
+    })
+    .map((item) => ({ ...item, source: "fallback" as const }))
+    .slice(0, 8);
+}
+
+function mergeResults(apiResults: StockSearchResult[], fallbackResults: StockSearchResult[]) {
+  const merged = [...apiResults, ...fallbackResults];
+  const seen = new Set<string>();
+
+  return merged.filter((item) => {
+    if (seen.has(item.symbol)) return false;
+    seen.add(item.symbol);
+    return true;
+  }).slice(0, 8);
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const query = normalizeQuery(searchParams.get("q") ?? "");
+
+  if (query.length < 2) {
+    return NextResponse.json({ query, results: [] });
+  }
+
+  const cacheKey = `search:${query}`;
+  const cached = getCachedValue<StockSearchResult[]>(cacheKey);
+
+  if (cached.state === "hit" && cached.value) {
+    return NextResponse.json({ query, results: cached.value, cache: "hit" });
+  }
+
+  const fallbackResults = fallbackSearch(query);
+  const supabaseResults = await searchSupabaseAssets(query, 8);
+  const apiResults = await searchBrapiStocks(query, 8);
+  const results = mergeResults([...supabaseResults, ...apiResults], fallbackResults);
+
+  if (results.length) {
+    setCachedValue(cacheKey, results, SEARCH_CACHE_TTL_MS, SEARCH_STALE_TTL_MS);
+    return NextResponse.json({ query, results, cache: "miss" });
+  }
+
+  if (cached.value) {
+    return NextResponse.json({ query, results: cached.value, cache: "stale" });
+  }
+
+  return NextResponse.json({ query, results: [] });
+}
