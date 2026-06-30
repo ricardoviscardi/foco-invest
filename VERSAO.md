@@ -1,22 +1,14 @@
-# Foco Invest v1.53.3
+# Foco Invest — v1.53.4
 
-Correção da instabilidade no download da CVM pelo GitHub Actions.
+Versão: v1.53.4 — fallback de cotação pelo histórico
 
-## Ajuste principal
+## Ajustes desta versão
 
-- Mantido retry da CVM.
-- Adicionado `CVM_FORCE_IPV4=1` por padrão.
-- O script `scripts/update_cvm_companies.py` agora força IPv4 nos downloads da CVM para evitar o erro `Errno 101: Network is unreachable` em runners do GitHub Actions.
+- Corrige exibição de "Cotação atual não disponível" quando há histórico de preços no banco.
+- Usa o último fechamento histórico como fallback para cotação atual.
+- Usa o penúltimo fechamento histórico para calcular variação diária quando a cotação direta não estiver disponível.
+- Mantém a correção anterior de IPv4/retry para downloads da CVM no GitHub Actions.
 
-## Próximo teste recomendado
+## Próximo passo
 
-Rodar no GitHub Actions:
-
-```text
-modo: completo_com_itr
-sleep: 1
-anos_dfp: 2024 2023 2022 2021
-anos_itr: 2025 2024
-```
-
-Se passar, validar a base e páginas principais.
+Validar páginas de ações localmente e avançar para v1.54 — FIIs oficiais + preparação para deploy.

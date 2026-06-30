@@ -527,11 +527,30 @@ export async function getStockFromSupabase(ticker: string): Promise<StockData | 
 
     const quote = latest(quotes);
     const latestIndicator = latest(indicatorRows);
-    const history = historyRows
-      .map((row) => ({ date: row.date, close: row.close }))
+    const orderedHistoryRows = [...historyRows]
+      .filter((row) => row.date && Number.isFinite(Number(row.close)))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const dividends12m = dividendsLast12Months(dividendRows, quote?.quote_date ? new Date(quote.quote_date) : new Date());
-    const dividendYield = latestIndicator?.dividend_yield ?? (quote?.price && dividends12m ? (dividends12m / quote.price) * 100 : null);
+    const latestHistoryRow = orderedHistoryRows.at(-1) ?? null;
+    const previousHistoryRow = orderedHistoryRows.at(-2) ?? null;
+    const history = orderedHistoryRows.map((row) => ({ date: row.date, close: Number(row.close) }));
+
+    const effectivePrice = quote?.price ?? latestHistoryRow?.close ?? null;
+    const effectivePreviousClose = quote?.previous_close ?? previousHistoryRow?.close ?? null;
+    const effectiveChangeValue = quote?.change_value ?? (
+      effectivePrice !== null && effectivePreviousClose !== null
+        ? effectivePrice - effectivePreviousClose
+        : null
+    );
+    const effectiveChangePercent = quote?.change_percent ?? (
+      effectiveChangeValue !== null && effectivePreviousClose !== null && effectivePreviousClose !== 0
+        ? (effectiveChangeValue / effectivePreviousClose) * 100
+        : null
+    );
+    const effectiveVolume = quote?.volume ?? latestHistoryRow?.volume ?? null;
+    const referenceDate = quote?.quote_date ? new Date(quote.quote_date) : latestHistoryRow?.date ? new Date(latestHistoryRow.date) : new Date();
+
+    const dividends12m = dividendsLast12Months(dividendRows, referenceDate);
+    const dividendYield = latestIndicator?.dividend_yield ?? (effectivePrice && dividends12m ? (dividends12m / effectivePrice) * 100 : null);
     const marketCap = quote?.market_cap ?? latestIndicator?.market_cap ?? null;
     const isFii = asset.kind === "fii";
     const cleanName = sanitizeNullable(asset.name) ?? sanitizeNullable(asset.company_name) ?? asset.ticker;
@@ -572,8 +591,8 @@ export async function getStockFromSupabase(ticker: string): Promise<StockData | 
       quoteRow("Abertura", quote?.open === null || quote?.open === undefined ? null : formatCurrency(quote.open), "Preço de abertura."),
       quoteRow("Máxima", quote?.high === null || quote?.high === undefined ? null : formatCurrency(quote.high), "Máxima do dia."),
       quoteRow("Mínima", quote?.low === null || quote?.low === undefined ? null : formatCurrency(quote.low), "Mínima do dia."),
-      quoteRow("Fech. anterior", quote?.previous_close === null || quote?.previous_close === undefined ? null : formatCurrency(quote.previous_close), "Fechamento anterior."),
-      quoteRow("Volume", quote?.volume === null || quote?.volume === undefined ? null : formatInteger(quote.volume), "Volume negociado."),
+      quoteRow("Fech. anterior", effectivePreviousClose === null || effectivePreviousClose === undefined ? null : formatCurrency(effectivePreviousClose), "Fechamento anterior."),
+      quoteRow("Volume", effectiveVolume === null || effectiveVolume === undefined ? null : formatInteger(effectiveVolume), "Volume negociado."),
       quoteRow("Valor de mercado", marketCap === null ? null : formatLargeCurrency(marketCap), "Valor de mercado.")
     ];
 
@@ -602,14 +621,14 @@ export async function getStockFromSupabase(ticker: string): Promise<StockData | 
       source: "Supabase/CVM/Yahoo",
       updatedAt: formatDateTime(quote?.updated_at ?? asset.updated_at),
       quote: {
-        price: quote?.price ?? null,
-        changeValue: quote?.change_value ?? null,
-        changePercent: quote?.change_percent ?? null,
+        price: effectivePrice,
+        changeValue: effectiveChangeValue,
+        changePercent: effectiveChangePercent,
         open: quote?.open ?? null,
         dayHigh: quote?.high ?? null,
         dayLow: quote?.low ?? null,
-        previousClose: quote?.previous_close ?? null,
-        volume: quote?.volume ?? null,
+        previousClose: effectivePreviousClose,
+        volume: effectiveVolume,
         marketCap
       },
       dividendSummary: {
@@ -620,7 +639,7 @@ export async function getStockFromSupabase(ticker: string): Promise<StockData | 
       dayQuoteRows,
       companyInfo,
       history,
-      oscillations: buildOscillations(history, quote?.price ?? null, quote?.change_percent ?? null),
+      oscillations: buildOscillations(history, effectivePrice, effectiveChangePercent),
       fundamentalAnalysis: buildFinancialAnalysis(financials, indicatorRows, asset.kind),
       dividends: dividendRows5y.map((row): DividendEvent => ({
         type: sanitizeNullable(row.type) ?? (isFii ? "Rendimento" : "Provento"),
@@ -630,7 +649,9 @@ export async function getStockFromSupabase(ticker: string): Promise<StockData | 
         status: "Não informado"
       })),
       related: [],
-      warnings: []
+      warnings: quote?.price === null || quote?.price === undefined
+        ? ["Cotação atual calculada a partir do último fechamento histórico disponível."]
+        : []
     };
   } catch {
     return null;

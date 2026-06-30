@@ -44,3 +44,8 @@ anos_itr: 2025 2024
 ## Arquivos sensíveis
 
 Não subir `.env`, `.env.local`, `.next`, `.venv`, `node_modules` ou chaves reais.
+
+
+## Versão atual
+
+v1.53.4 — fallback de cotação pelo histórico quando `asset_quotes` não retorna cotação direta.
