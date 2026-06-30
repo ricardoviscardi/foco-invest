@@ -13,13 +13,14 @@ Exemplos:
 """
 from __future__ import annotations
 
-import argparse, io, math, os, re, time, unicodedata, zipfile
+import argparse, io, math, os, re, socket, time, unicodedata, zipfile
 from datetime import date, datetime, timezone
 from difflib import SequenceMatcher
 from typing import Any
 
 import pandas as pd
 import requests
+import urllib3.util.connection as urllib3_connection
 
 from config import get_required_env, load_project_env
 from supabase_rest import SupabaseConfig, SupabaseRestClient
@@ -31,6 +32,22 @@ ITR_URL_TEMPLATE = "https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/ITR/DADOS/itr_
 
 CVM_RETRY_ATTEMPTS = int(os.environ.get("CVM_RETRY_ATTEMPTS", "6"))
 CVM_RETRY_BASE_SLEEP = float(os.environ.get("CVM_RETRY_BASE_SLEEP", "10"))
+CVM_FORCE_IPV4 = os.environ.get("CVM_FORCE_IPV4", "1").lower() not in {"0", "false", "no", "nao"}
+
+if CVM_FORCE_IPV4:
+    # Em alguns runners do GitHub Actions, o domínio da CVM pode resolver IPv6
+    # sem rota disponível, gerando Errno 101: Network is unreachable.
+    # Forçar IPv4 torna o download mais estável nesses casos.
+    def _cvm_allowed_gai_family() -> socket.AddressFamily:
+        return socket.AF_INET
+
+    urllib3_connection.allowed_gai_family = _cvm_allowed_gai_family
+
+CVM_SESSION = requests.Session()
+CVM_SESSION.headers.update({
+    "User-Agent": "FocoInvestDataUpdater/1.53.3 (+https://github.com/ricardoviscardi/foco-invest)",
+    "Accept": "text/csv,application/zip,application/octet-stream,*/*",
+})
 
 TICKER_HINTS: dict[str, list[str]] = {
     "ABEV3":["AMBEV"], "PETR3":["PETROLEO BRASILEIRO","PETROBRAS"], "PETR4":["PETROLEO BRASILEIRO","PETROBRAS"],
@@ -90,7 +107,7 @@ def cvm_get(url: str, *, timeout: int = 120, attempts: int = CVM_RETRY_ATTEMPTS)
     last_error: Exception | None = None
     for attempt in range(1, attempts + 1):
         try:
-            response = requests.get(url, timeout=timeout)
+            response = CVM_SESSION.get(url, timeout=timeout)
             if response.status_code == 404:
                 print({"warning": "cvm_url_not_found", "url": url, "status_code": response.status_code})
                 return None

@@ -1,60 +1,46 @@
 # Foco Invest
 
-Website planejado: `www.focoinvest.com.br`
+Projeto Next.js + TypeScript + Tailwind para consulta pública de ações brasileiras, fundamentos, indicadores, proventos e rankings.
 
 ## Versão atual
 
-**v1.53.2 — Correção da etapa CVM no GitHub Actions**
+**v1.53.3 — Correção de rede CVM no GitHub Actions**
 
+## Correção v1.53.3
 
-## Correção v1.53.2
+Esta versão ajusta a etapa de download da CVM no GitHub Actions.
 
-- Corrige erro `NameError: name 'choose_frame' is not defined` no script `scripts/update_cvm_companies.py`.
-- Ajusta o modo `cvm` do workflow para considerar também `anos_itr`.
-
-## Novidades
-
-- Workflow manual e agendado para ações:
-  - `.github/workflows/update-acoes.yml`
-- Workflow semanal para fundamentos CVM:
-  - `.github/workflows/update-cvm-semanal.yml`
-- Guia:
-  - `GITHUB_ACTIONS_SETUP.md`
-
-## Por que isso foi feito
-
-A rede da empresa bloqueou o domínio do Supabase via OpenDNS/Cisco Umbrella. Então a atualização pesada passa a rodar fora da rede local, pelo GitHub Actions.
-
-## Secrets necessários
+O erro observado foi:
 
 ```text
-SUPABASE_URL
-SUPABASE_SERVICE_ROLE_KEY
+Errno 101: Network is unreachable
 ```
 
-Opcional:
+Ajustes aplicados:
 
 ```text
-BRAPI_API_TOKEN
+1. Mantém tentativas automáticas de download da CVM.
+2. Força IPv4 nos requests para dados.cvm.gov.br.
+3. Define CVM_FORCE_IPV4=1 nos workflows do GitHub Actions.
 ```
 
-## Como rodar
+## Rodar a atualização completa
+
+No GitHub:
 
 ```text
 Actions > Atualizar ações > Run workflow
 ```
 
-Modos:
+Usar:
 
 ```text
-precos
-cvm
-completo_sem_itr
-completo_com_itr
+modo: completo_com_itr
+sleep: 1
+anos_dfp: 2024 2023 2022 2021
+anos_itr: 2025 2024
 ```
 
-## Próximo passo
+## Arquivos sensíveis
 
-Depois de validar a action e atualizar as ações:
-
-**v1.54 — FIIs oficiais + revisão final para deploy.**
+Não subir `.env`, `.env.local`, `.next`, `.venv`, `node_modules` ou chaves reais.

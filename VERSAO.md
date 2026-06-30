@@ -1,30 +1,16 @@
-# Foco Invest v1.53.2
+# Foco Invest v1.53.3
 
-## Correção desta versão
+Correção da instabilidade no download da CVM pelo GitHub Actions.
 
-- Mantida a correção da v1.53.1 para a função `choose_frame` na etapa CVM.
-- Corrigida a rotina de download da CVM para lidar melhor com falhas temporárias de rede no GitHub Actions, como:
-  - `Network is unreachable`
-  - `Max retries exceeded`
-  - falha temporária ao acessar `dados.cvm.gov.br`
-- Adicionadas novas tentativas automáticas antes de considerar a etapa CVM como falha.
-- O script agora imprime avisos de retry no log, facilitando identificar quando a CVM ou a rede do runner estiver instável.
+## Ajuste principal
 
-## Por que foi necessário
+- Mantido retry da CVM.
+- Adicionado `CVM_FORCE_IPV4=1` por padrão.
+- O script `scripts/update_cvm_companies.py` agora força IPv4 nos downloads da CVM para evitar o erro `Errno 101: Network is unreachable` em runners do GitHub Actions.
 
-O modo `cvm` passou, mas o modo `completo_com_itr` falhou depois, quando o GitHub Actions tentou acessar o endereço público da CVM e recebeu erro temporário de rede.
+## Próximo teste recomendado
 
-Isso não era mais o erro anterior de código. A falha ocorreu no acesso externo à CVM.
-
-## Como validar
-
-Depois de subir esta versão para o GitHub, rode novamente:
-
-```text
-Actions > Atualizar ações > Run workflow
-```
-
-Use:
+Rodar no GitHub Actions:
 
 ```text
 modo: completo_com_itr
@@ -33,4 +19,4 @@ anos_dfp: 2024 2023 2022 2021
 anos_itr: 2025 2024
 ```
 
-Se ainda falhar com `Network is unreachable`, aguarde alguns minutos e rode novamente, pois nesse caso será indisponibilidade externa temporária da CVM/GitHub runner.
+Se passar, validar a base e páginas principais.

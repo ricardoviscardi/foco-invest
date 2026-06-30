@@ -17,6 +17,7 @@ jobs:
       PYTHONUNBUFFERED: "1"
       CVM_RETRY_ATTEMPTS: "8"
       CVM_RETRY_BASE_SLEEP: "10"
+      CVM_FORCE_IPV4: "1"
 
     steps:
       - name: Baixar repositório
