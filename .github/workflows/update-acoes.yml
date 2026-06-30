@@ -80,7 +80,7 @@ jobs:
       - name: Atualizar apenas CVM
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.modo == 'cvm' }}
         run: |
-          python scripts/update_cvm_companies.py --all --years ${{ inputs.anos_dfp }}
+          python scripts/update_cvm_companies.py --all --years ${{ inputs.anos_dfp }} --itr-years ${{ inputs.anos_itr }}
 
       - name: Atualizar completo sem ITR
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.modo == 'completo_sem_itr' }}

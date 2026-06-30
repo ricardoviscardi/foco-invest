@@ -212,6 +212,70 @@ def qlabel(ref: str) -> str:
     q=max(1,min(4,math.ceil(int(ref[5:7])/3)))
     return f"{q}T"
 
+
+
+def choose_frame(zf: zipfile.ZipFile, frame_code: str, year: int) -> tuple[str | None, pd.DataFrame]:
+    """
+    Localiza e lê um quadro dentro do ZIP da CVM, preferindo arquivos consolidados.
+
+    Exemplos dentro dos ZIPs da CVM:
+    - dfp_cia_aberta_BPA_con_2024.csv
+    - dfp_cia_aberta_BPA_ind_2024.csv
+    - itr_cia_aberta_DRE_con_2025.csv
+
+    Retorna (nome_do_arquivo, dataframe). Se o quadro não existir, retorna
+    (None, DataFrame vazio), permitindo fallback para outros quadros.
+    """
+    code = str(frame_code or "").strip().upper()
+    year_text = str(year)
+
+    def candidate_score(name: str) -> int:
+        base = name.split("/")[-1].lower()
+        if not base.endswith(".csv"):
+            return -1
+        if code.lower() not in base or year_text not in base:
+            return -1
+
+        score = 10
+        if f"_{code.lower()}_con_" in base:
+            score += 100
+        elif f"_{code.lower()}_ind_" in base:
+            score += 80
+        else:
+            score += 40
+
+        if base.startswith("dfp_cia_aberta") or base.startswith("itr_cia_aberta"):
+            score += 10
+        return score
+
+    candidates = [name for name in zf.namelist() if candidate_score(name) >= 0]
+    if not candidates:
+        return None, pd.DataFrame()
+
+    selected = sorted(candidates, key=candidate_score, reverse=True)[0]
+    df = read_member(zf, selected)
+    return selected, df
+
+
+def normalize_cvm_code(value: Any) -> int | None:
+    """Normaliza o código CVM para inteiro."""
+    return int_or_none(value)
+
+
+def references(frames: list[pd.DataFrame]) -> list[str]:
+    """Compatibilidade com a versão atual de rows_from_zip."""
+    return refs(frames)
+
+
+def value_for(df: pd.DataFrame, ref: str, accounts: list[str], keywords: list[str]) -> float | None:
+    """Compatibilidade com a versão atual de rows_from_zip."""
+    return value(df, ref, accounts, keywords)
+
+
+def quarter_label(ref: str) -> str:
+    """Compatibilidade com a versão atual de rows_from_zip."""
+    return qlabel(ref)
+
 def rows_from_zip(
     zf: zipfile.ZipFile,
     year: int,
