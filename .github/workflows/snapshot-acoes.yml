@@ -15,6 +15,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: foco-invest-snapshot-main
+  cancel-in-progress: false
+
 jobs:
   snapshot-acoes:
     runs-on: ubuntu-latest
@@ -75,11 +79,38 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/data/snapshots
-          if git diff --cached --quiet; then
-            echo "Nenhuma alteração de snapshot para publicar."
-          else
-            git commit -m "atualiza snapshot completo de ações"
-            git pull --rebase origin main
-            git push
+
+          if [ ! -d public/data/snapshots ]; then
+            echo "Nenhum snapshot encontrado para publicar."
+            exit 0
           fi
+
+          SNAPSHOT_TMP="$(mktemp -d)"
+          cp -a public/data/snapshots "$SNAPSHOT_TMP/snapshots"
+
+          for attempt in 1 2 3; do
+            echo "Tentativa de publicação do snapshot: $attempt/3"
+            git fetch origin main
+            git reset --hard origin/main
+            rm -rf public/data/snapshots
+            mkdir -p public/data
+            cp -a "$SNAPSHOT_TMP/snapshots" public/data/snapshots
+            git add public/data/snapshots
+
+            if git diff --cached --quiet; then
+              echo "Nenhuma alteração de snapshot para publicar."
+              exit 0
+            fi
+
+            git commit -m "atualiza snapshot completo de ações"
+            if git push origin HEAD:main; then
+              echo "Snapshot publicado com sucesso."
+              exit 0
+            fi
+
+            echo "Push recusado porque o remoto mudou. Recriando commit sobre origin/main..."
+            sleep 5
+          done
+
+          echo "Não foi possível publicar o snapshot após 3 tentativas."
+          exit 1

@@ -1,6 +1,6 @@
 # Foco Invest
 
-Versão: v1.53.21 — Redução de dados indisponíveis em ações e FIIs. — v1.53.10
+Versão: v1.53.22 — Redução de dados indisponíveis em ações e FIIs. — v1.53.10
 
 Versão com snapshot local de ações para testar a base completa em redes que bloqueiam o Supabase.
 
@@ -109,6 +109,13 @@ Correção do fluxo de dados para redes que bloqueiam o Supabase: adiciona workf
 - Atualiza cache para `v15319`.
 
 
-## Nota v1.53.21
+## Nota v1.53.22
 
 A atualização completa de ações agora é tolerante a timeout temporário da CVM. Se `dados.cvm.gov.br` falhar no GitHub Actions, o workflow continua e publica snapshot com os dados já existentes no Supabase somados aos preços/proventos atualizados. Para testar a CVM de forma rígida, use o modo `cvm` isolado.
+
+
+## v1.53.22 — publicação segura de snapshots
+
+Correção nos workflows para evitar erro de `main -> main (fetch first)` quando ações e FIIs tentam publicar snapshots próximos um do outro.
+
+Agora os workflows que publicam snapshot entram em fila e, antes do push, sincronizam com `origin/main`, reaplicam os arquivos gerados e tentam publicar novamente.

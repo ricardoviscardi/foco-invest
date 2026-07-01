@@ -1,6 +1,6 @@
 # Versão atual
 
-v1.53.21 — Redução de dados indisponíveis em ações e FIIs.
+v1.53.22 — Publicação segura de snapshots no GitHub Actions.
 
 # Foco Invest - v1.53.18
 
@@ -27,3 +27,11 @@ Correção de match CVM para NTCO3/WIZC3 e publicação segura do snapshot.
 - `completo_sem_itr` e `completo_com_itr` agora continuam a rotina se a CVM falhar temporariamente.
 - Snapshot pode ser publicado com dados existentes + preços/proventos atualizados, sem travar toda a atualização.
 - Modo `cvm` isolado continua funcionando como teste rígido da CVM.
+
+
+## v1.53.22
+
+- Corrige erro de `git push` recusado nos workflows quando outro workflow ou commit atualiza a branch `main` antes da publicação do snapshot.
+- Adiciona fila/concurrency entre workflows que publicam snapshot, evitando corrida entre atualização de ações e FIIs.
+- Publicação do snapshot agora faz `fetch`, `reset` para `origin/main`, reaplica o snapshot gerado e tenta o `push` até 3 vezes.
+- Ajuste aplicado em `Atualizar ações`, `Atualizar FIIs` e `Recriar snapshot de ações`.
