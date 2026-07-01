@@ -35,6 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--itr-years", nargs="+", default=default_itr_years())
     parser.add_argument("--skip-prices", action="store_true", help="Pula atualização de preço/histórico/proventos.")
     parser.add_argument("--skip-cvm", action="store_true", help="Pula atualização CVM.")
+    parser.add_argument("--cvm-optional", action="store_true", help="Continua a rotina mesmo se a CVM estiver temporariamente indisponível.")
     parser.add_argument("--prices-optional", action="store_true", help="Continua para CVM mesmo se preços falharem.")
     parser.add_argument("--b3-stocks", action="store_true", help="Usa universo amplo/dinâmico de ações da B3 na etapa de preços.")
     return parser
@@ -52,7 +53,12 @@ def main() -> int:
         cvm_command = [sys.executable, "scripts/update_cvm_companies.py", "--all", "--years", *args.years]
         if args.with_itr:
             cvm_command.extend(["--itr-years", *args.itr_years])
-        run(cvm_command)
+        cvm_ok = run(cvm_command, optional=args.cvm_optional)
+        if not cvm_ok and args.cvm_optional:
+            print({
+                "warning": "cvm_unavailable_continuing",
+                "message": "A CVM falhou nesta execução. A rotina continuará para permitir publicar snapshot com os dados já existentes no Supabase e os preços atualizados."
+            })
 
     run([sys.executable, "scripts/check_supabase_data.py"])
     return 0

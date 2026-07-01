@@ -1,6 +1,6 @@
 # Versão atual
 
-v1.53.20 — Redução de dados indisponíveis em ações e FIIs.
+v1.53.21 — Redução de dados indisponíveis em ações e FIIs.
 
 # Foco Invest - v1.53.18
 
@@ -19,3 +19,11 @@ Correção de match CVM para NTCO3/WIZC3 e publicação segura do snapshot.
 - Complementa FIIs via rotina Python `update_fii_fundamentus.py`.
 - Ajusta workflows para publicar snapshot em atualização manual e agendada.
 - Atualiza cache para `v15319`.
+
+
+## v1.53.21
+
+- Corrige falha do workflow quando a CVM fica indisponível por timeout.
+- `completo_sem_itr` e `completo_com_itr` agora continuam a rotina se a CVM falhar temporariamente.
+- Snapshot pode ser publicado com dados existentes + preços/proventos atualizados, sem travar toda a atualização.
+- Modo `cvm` isolado continua funcionando como teste rígido da CVM.

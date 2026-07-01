@@ -115,7 +115,7 @@ jobs:
         run: |
           EXTRA=""
           if [ "${{ inputs.universo }}" = "todas_acoes_b3" ]; then EXTRA="--b3-stocks"; fi
-          python scripts/update_all_stocks_full.py --sleep ${{ inputs.sleep }} $EXTRA --years ${{ inputs.anos_dfp }}
+          python scripts/update_all_stocks_full.py --sleep ${{ inputs.sleep }} $EXTRA --years ${{ inputs.anos_dfp }} --cvm-optional
 
       - name: Atualizar completo com ITR
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.modo == 'completo_com_itr' }}
@@ -123,7 +123,7 @@ jobs:
         run: |
           EXTRA=""
           if [ "${{ inputs.universo }}" = "todas_acoes_b3" ]; then EXTRA="--b3-stocks"; fi
-          python scripts/update_all_stocks_full.py --sleep ${{ inputs.sleep }} $EXTRA --with-itr --years ${{ inputs.anos_dfp }} --itr-years ${{ inputs.anos_itr }}
+          python scripts/update_all_stocks_full.py --sleep ${{ inputs.sleep }} $EXTRA --with-itr --years ${{ inputs.anos_dfp }} --itr-years ${{ inputs.anos_itr }} --cvm-optional
 
       - name: Conferir base
         if: always()
