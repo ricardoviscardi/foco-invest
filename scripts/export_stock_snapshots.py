@@ -88,7 +88,7 @@ def export_ticker(client: SupabaseRestClient, ticker: str, output_dir: Path, lim
     })
 
     payload = {
-        "version": "v1.53.10",
+        "version": "v1.53.11",
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "ticker": ticker,
         "asset": assets[0],
@@ -118,7 +118,7 @@ def export_ticker(client: SupabaseRestClient, ticker: str, output_dir: Path, lim
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Exporta snapshot local de dados do Supabase para testes em redes bloqueadas.")
+    parser = argparse.ArgumentParser(description="Exporta snapshot de dados do Supabase para testes em redes bloqueadas e publicação no repositório.")
     parser.add_argument("--ticker", action="append", default=[], help="Ticker específico. Pode ser usado várias vezes.")
     parser.add_argument("--all-stocks", action="store_true", help="Exporta todas as ações cadastradas em assets.kind=stock.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="Pasta de saída dos JSONs.")
@@ -141,7 +141,7 @@ def main() -> int:
             summaries.append(summary)
 
     index_payload = {
-        "version": "v1.53.10",
+        "version": "v1.53.11",
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "total": len(summaries),
         "tickers": [item["ticker"] for item in summaries],

@@ -33,9 +33,20 @@ on:
         options:
           - base_ampliada
           - todas_acoes_b3
+      publicar_snapshot:
+        description: "Publicar snapshot no repositório para teste local sem Supabase"
+        required: false
+        default: "sim"
+        type: choice
+        options:
+          - sim
+          - nao
 
   schedule:
     - cron: "30 23 * * 1-5"
+
+permissions:
+  contents: write
 
 jobs:
   atualizar-acoes:
@@ -133,6 +144,20 @@ jobs:
             public/data/snapshots/index.json
             public/data/snapshots/stocks/*.json
           if-no-files-found: ignore
+
+      - name: Publicar snapshot no repositório
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.publicar_snapshot == 'sim' }}
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/snapshots
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteração de snapshot para publicar."
+          else
+            git commit -m "atualiza snapshot local de ações"
+            git push
+          fi
 
       - name: Salvar relatórios
         if: always()

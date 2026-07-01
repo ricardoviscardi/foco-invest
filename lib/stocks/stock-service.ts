@@ -1,6 +1,7 @@
 import { fetchBrapiBundle } from "@/lib/stocks/brapi-client";
 import { getStockFromSupabase } from "@/lib/stocks/supabase-stock-repository";
 import { getStockFromLocalSnapshot } from "@/lib/stocks/local-snapshot-repository";
+import { getStockFromRemoteSnapshot } from "@/lib/stocks/remote-snapshot-repository";
 import {
   createUnavailableStock,
   mapBrapiToStockData,
@@ -26,7 +27,7 @@ import {
   toFiniteNumber,
 } from "@/lib/utils/formatters";
 
-const STOCK_CACHE_VERSION = "v1539";
+const STOCK_CACHE_VERSION = "v15311";
 const STOCK_CACHE_TTL_MS = 15 * 60 * 1000;
 const STOCK_STALE_TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -569,8 +570,13 @@ export async function getStockByTicker(ticker: string): Promise<StockData> {
   }
 
   const supabaseStock = await getStockFromSupabase(normalizedTicker);
-  const snapshotStock = supabaseStock ? null : await getStockFromLocalSnapshot(normalizedTicker);
-  const primaryStock = supabaseStock ?? snapshotStock;
+  const localSnapshotStock = supabaseStock
+    ? null
+    : await getStockFromLocalSnapshot(normalizedTicker);
+  const remoteSnapshotStock = supabaseStock || localSnapshotStock
+    ? null
+    : await getStockFromRemoteSnapshot(normalizedTicker);
+  const primaryStock = supabaseStock ?? localSnapshotStock ?? remoteSnapshotStock;
 
   if (primaryStock) {
     if (!hasMissingImportantData(primaryStock)) {

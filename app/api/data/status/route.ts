@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkSupabaseTable, getSupabaseConnectionStatus } from "@/lib/supabase/server";
 import { getSnapshotStatus } from "@/lib/stocks/local-snapshot-repository";
+import { getRemoteSnapshotStatus } from "@/lib/stocks/remote-snapshot-repository";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -25,6 +26,7 @@ function hasNetworkBlock(tableStatuses: Awaited<ReturnType<typeof checkSupabaseT
 export async function GET() {
   const connection = getSupabaseConnectionStatus();
   const snapshot = getSnapshotStatus();
+  const remoteSnapshot = getRemoteSnapshotStatus();
 
   if (!connection.configured) {
     return NextResponse.json({
@@ -32,6 +34,7 @@ export async function GET() {
       blockedByNetwork: false,
       connection,
       snapshot,
+      remoteSnapshot,
       tables: [],
       nextStep: "Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no .env.local.",
     }, { status: 200 });
@@ -50,11 +53,12 @@ export async function GET() {
       keyType: connection.keyType,
     },
     snapshot,
+    remoteSnapshot,
     tables: tableStatuses,
     nextStep: connected
       ? "Conexão com Supabase ok. As páginas devem usar a base completa."
       : blockedByNetwork
-        ? "A rede local está bloqueando o domínio do Supabase via OpenDNS/Cisco Umbrella. Teste em outra internet, libere o domínio na rede ou use o snapshot local exportado pelo GitHub Actions."
+        ? "A rede local está bloqueando o domínio do Supabase via OpenDNS/Cisco Umbrella. O site tentará usar snapshot local ou remoto. Rode a Action publicando snapshot e depois dê git pull."
         : "Alguma tabela falhou. Verifique se o schema foi executado e se a chave tem permissão.",
   });
 }
