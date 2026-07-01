@@ -7,7 +7,7 @@ import type {
   StockFinancialRow,
   StockHistoryPoint,
   StockIndicator,
-  StockOscillation
+  StockOscillation,
 } from "@/types/stock";
 import {
   formatCurrency,
@@ -16,10 +16,9 @@ import {
   formatInteger,
   formatLargeCurrency,
   formatNumber,
-  formatPlainPercent
+  formatPlainPercent,
 } from "@/lib/utils/formatters";
 import { sameDisplayText, sanitizeDisplayText } from "@/lib/utils/text";
-
 
 function cleanText(value: string | null | undefined): string | null {
   const sanitized = sanitizeDisplayText(value);
@@ -30,7 +29,10 @@ function asNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
 
   if (typeof value === "string") {
-    const cleaned = value.replace(/[R$\s%]/g, "").replace(/\./g, "").replace(",", ".");
+    const cleaned = value
+      .replace(/[R$\s%]/g, "")
+      .replace(/\./g, "")
+      .replace(",", ".");
     const parsed = Number(cleaned);
     return Number.isFinite(parsed) ? parsed : null;
   }
@@ -70,17 +72,48 @@ function firstString(source: unknown, paths: readonly string[]): string | null {
   return null;
 }
 
-function normalizePercentValue(value: number | null): number | null {
-  if (value === null) return null;
-  return Math.abs(value) <= 1 ? value * 100 : value;
+function normalizePercentValue(
+  value: number | null,
+  maxAbs = 100,
+): number | null {
+  if (value === null || !Number.isFinite(value)) return null;
+  const normalized = Math.abs(value) <= 1 ? value * 100 : value;
+  return Math.abs(normalized) <= maxAbs ? normalized : null;
 }
 
-function formatPercentValue(value: number | null): string | null {
-  const normalizedValue = normalizePercentValue(value);
+function normalizeAlreadyPercentValue(
+  value: number | null,
+  maxAbs = 100,
+): number | null {
+  if (value === null || !Number.isFinite(value) || Math.abs(value) > maxAbs)
+    return null;
+  return value;
+}
+
+function formatPercentValue(value: number | null, maxAbs = 100): string | null {
+  const normalizedValue = normalizePercentValue(value, maxAbs);
   return normalizedValue === null ? null : formatPlainPercent(normalizedValue);
 }
 
-function formatByKind(value: number | null, kind: "number" | "percent" | "currency" | "largeCurrency" | "integer"): string | null {
+function formatAlreadyPercentValue(
+  value: number | null,
+  maxAbs = 100,
+): string | null {
+  const normalizedValue = normalizeAlreadyPercentValue(value, maxAbs);
+  return normalizedValue === null ? null : formatPlainPercent(normalizedValue);
+}
+
+function plausibleDividendYield(
+  value: number | null,
+  isFii: boolean,
+): number | null {
+  return normalizeAlreadyPercentValue(value, isFii ? 35 : 25);
+}
+
+function formatByKind(
+  value: number | null,
+  kind: "number" | "percent" | "currency" | "largeCurrency" | "integer",
+): string | null {
   if (value === null) return null;
   if (kind === "percent") return formatPercentValue(value);
   if (kind === "currency") return formatCurrency(value);
@@ -89,20 +122,28 @@ function formatByKind(value: number | null, kind: "number" | "percent" | "curren
   return formatNumber(value);
 }
 
-function indicator(label: string, value: string | null, description: string): StockIndicator {
+function indicator(
+  label: string,
+  value: string | null,
+  description: string,
+): StockIndicator {
   return {
     label,
     value: value ?? "Não disponível",
     description,
-    status: value ? "api" : "indisponível"
+    status: value ? "api" : "indisponível",
   };
 }
 
-function quoteRow(label: string, value: string | null, note: string): StockFinancialRow {
+function quoteRow(
+  label: string,
+  value: string | null,
+  note: string,
+): StockFinancialRow {
   return {
     label,
     value: value ?? "Não disponível",
-    note
+    note,
   };
 }
 
@@ -117,7 +158,10 @@ function dataOf(asset: BrapiAsset | null): Record<string, unknown> | null {
   return asset;
 }
 
-function arrayFromPossible(source: unknown, keys: readonly string[]): Record<string, unknown>[] {
+function arrayFromPossible(
+  source: unknown,
+  keys: readonly string[],
+): Record<string, unknown>[] {
   if (!source || typeof source !== "object") return [];
 
   for (const key of keys) {
@@ -161,11 +205,7 @@ function yearFromRow(row: Record<string, unknown>): number | null {
 
 function isQuarterlyRow(row: Record<string, unknown>): boolean {
   const period = String(
-    row.period ??
-    row.fiscalPeriod ??
-    row.quarter ??
-    row.type ??
-    ""
+    row.period ?? row.fiscalPeriod ?? row.quarter ?? row.type ?? "",
   ).toLowerCase();
 
   return (
@@ -176,9 +216,15 @@ function isQuarterlyRow(row: Record<string, unknown>): boolean {
   );
 }
 
-function columnsFromRows(rows: Record<string, unknown>[], period: "annual" | "quarterly", firstColumn: string): string[] {
+function columnsFromRows(
+  rows: Record<string, unknown>[],
+  period: "annual" | "quarterly",
+  firstColumn: string,
+): string[] {
   if (!rows.length) {
-    return period === "annual" ? getYearColumns() : ["Atual", "—", "—", "—", "—", "—"];
+    return period === "annual"
+      ? getYearColumns()
+      : ["Atual", "—", "—", "—", "—", "—"];
   }
 
   const labels = rows.slice(0, 6).map((row, index) => {
@@ -195,10 +241,11 @@ function columnsFromRows(rows: Record<string, unknown>[], period: "annual" | "qu
       return index === 0 ? firstColumn : "—";
     }
 
-    return year ? String(year) : (index === 0 ? firstColumn : "—");
+    return year ? String(year) : index === 0 ? firstColumn : "—";
   });
 
-  const fallbackYears = period === "annual" ? getYearColumns() : ["Atual", "—", "—", "—", "—", "—"];
+  const fallbackYears =
+    period === "annual" ? getYearColumns() : ["Atual", "—", "—", "—", "—", "—"];
 
   while (labels.length < 6) {
     labels.push(fallbackYears[labels.length] ?? "—");
@@ -221,86 +268,219 @@ function buildTable(args: {
 }): AnalysisTable {
   const sourceData = dataOf(args.source) ?? args.source;
   const rawRows = arrayFromPossible(sourceData, args.rowKeys);
-  const periodRows = args.period === "quarterly"
-    ? rawRows.filter(isQuarterlyRow)
-    : rawRows.filter((row) => !isQuarterlyRow(row));
+  const periodRows =
+    args.period === "quarterly"
+      ? rawRows.filter(isQuarterlyRow)
+      : rawRows.filter((row) => !isQuarterlyRow(row));
   const rowsFromApi = periodRows.slice(0, 6);
 
   const rows = args.definitions.map((definition) => {
     const values = rowsFromApi.length
-      ? rowsFromApi.map((row) => formatByKind(firstNumber(row, definition.paths), definition.kind) ?? "—")
+      ? rowsFromApi.map(
+          (row) =>
+            formatByKind(firstNumber(row, definition.paths), definition.kind) ??
+            "—",
+        )
       : Array(6).fill("—");
 
     while (values.length < 6) values.push("—");
 
     return {
       label: definition.label,
-      values
+      values,
     };
   });
 
   return {
     columns: columnsFromRows(rowsFromApi, args.period, args.firstColumn),
     rows,
-    emptyMessage: args.emptyMessage
+    emptyMessage: args.emptyMessage,
   };
 }
 
 const indicatorDefinitions = [
-  { label: "P/L", paths: ["priceEarnings", "trailingPE", "peRatio", "priceToEarnings"], kind: "number" },
-  { label: "P/VP", paths: ["priceToBook", "priceBookValue", "pbRatio"], kind: "number" },
+  {
+    label: "P/L",
+    paths: ["priceEarnings", "trailingPE", "peRatio", "priceToEarnings"],
+    kind: "number",
+  },
+  {
+    label: "P/VP",
+    paths: ["priceToBook", "priceBookValue", "pbRatio"],
+    kind: "number",
+  },
   { label: "P/Receita", paths: ["priceToSales", "priceSales"], kind: "number" },
   { label: "P/EBIT", paths: ["priceToEbit", "pEbit"], kind: "number" },
   { label: "P/EBITDA", paths: ["priceToEbitda", "pEbitda"], kind: "number" },
-  { label: "EV/EBITDA", paths: ["enterpriseToEbitda", "evToEbitda"], kind: "number" },
+  {
+    label: "EV/EBITDA",
+    paths: ["enterpriseToEbitda", "evToEbitda"],
+    kind: "number",
+  },
   { label: "EV/EBIT", paths: ["enterpriseToEbit", "evToEbit"], kind: "number" },
-  { label: "Margem bruta", paths: ["grossMargins", "grossMargin"], kind: "percent" },
-  { label: "Margem EBITDA", paths: ["ebitdaMargins", "ebitdaMargin"], kind: "percent" },
-  { label: "Margem EBIT", paths: ["operatingMargins", "ebitMargin"], kind: "percent" },
-  { label: "Margem líquida", paths: ["profitMargins", "netMargin"], kind: "percent" },
+  {
+    label: "Margem bruta",
+    paths: ["grossMargins", "grossMargin"],
+    kind: "percent",
+  },
+  {
+    label: "Margem EBITDA",
+    paths: ["ebitdaMargins", "ebitdaMargin"],
+    kind: "percent",
+  },
+  {
+    label: "Margem EBIT",
+    paths: ["operatingMargins", "ebitMargin"],
+    kind: "percent",
+  },
+  {
+    label: "Margem líquida",
+    paths: ["profitMargins", "netMargin"],
+    kind: "percent",
+  },
   { label: "ROE", paths: ["returnOnEquity", "roe"], kind: "percent" },
   { label: "ROA", paths: ["returnOnAssets", "roa"], kind: "percent" },
-  { label: "ROIC", paths: ["returnOnInvestedCapital", "roic"], kind: "percent" },
-  { label: "Dív.Líq/EBITDA", paths: ["netDebtToEbitda", "debtToEbitda"], kind: "number" },
-  { label: "Dividend Yield", paths: ["dividendYield", "trailingAnnualDividendYield"], kind: "percent" }
+  {
+    label: "ROIC",
+    paths: ["returnOnInvestedCapital", "roic"],
+    kind: "percent",
+  },
+  {
+    label: "Dív.Líq/EBITDA",
+    paths: ["netDebtToEbitda", "debtToEbitda"],
+    kind: "number",
+  },
+  {
+    label: "Dividend Yield",
+    paths: ["dividendYield", "trailingAnnualDividendYield"],
+    kind: "percent",
+  },
 ] as const;
 
 const balanceDefinitions = [
   { label: "Ativo total", paths: ["totalAssets"], kind: "largeCurrency" },
-  { label: "Ativo circulante", paths: ["totalCurrentAssets", "currentAssets"], kind: "largeCurrency" },
-  { label: "Caixa e equivalentes", paths: ["cashAndCashEquivalents", "cash"], kind: "largeCurrency" },
-  { label: "Contas a receber", paths: ["netReceivables", "accountsReceivable"], kind: "largeCurrency" },
+  {
+    label: "Ativo circulante",
+    paths: ["totalCurrentAssets", "currentAssets"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Caixa e equivalentes",
+    paths: ["cashAndCashEquivalents", "cash"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Contas a receber",
+    paths: ["netReceivables", "accountsReceivable"],
+    kind: "largeCurrency",
+  },
   { label: "Estoques", paths: ["inventory"], kind: "largeCurrency" },
-  { label: "Ativo não circulante", paths: ["totalNonCurrentAssets", "nonCurrentAssets"], kind: "largeCurrency" },
-  { label: "Passivo total", paths: ["totalLiabilities"], kind: "largeCurrency" },
-  { label: "Passivo circulante", paths: ["totalCurrentLiabilities", "currentLiabilities"], kind: "largeCurrency" },
-  { label: "Dívida curto prazo", paths: ["shortLongTermDebt", "shortTermDebt"], kind: "largeCurrency" },
-  { label: "Dívida longo prazo", paths: ["longTermDebt"], kind: "largeCurrency" },
-  { label: "Patrimônio líquido", paths: ["totalStockholderEquity", "stockholdersEquity", "totalEquity"], kind: "largeCurrency" }
+  {
+    label: "Ativo não circulante",
+    paths: ["totalNonCurrentAssets", "nonCurrentAssets"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Passivo total",
+    paths: ["totalLiabilities"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Passivo circulante",
+    paths: ["totalCurrentLiabilities", "currentLiabilities"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Dívida curto prazo",
+    paths: ["shortLongTermDebt", "shortTermDebt"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Dívida longo prazo",
+    paths: ["longTermDebt"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Patrimônio líquido",
+    paths: ["totalStockholderEquity", "stockholdersEquity", "totalEquity"],
+    kind: "largeCurrency",
+  },
 ] as const;
 
 const incomeDefinitions = [
-  { label: "Receita líquida", paths: ["totalRevenue", "revenue"], kind: "largeCurrency" },
-  { label: "Custo dos produtos/serviços", paths: ["costOfRevenue", "costOfGoodsSold"], kind: "largeCurrency" },
+  {
+    label: "Receita líquida",
+    paths: ["totalRevenue", "revenue"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Custo dos produtos/serviços",
+    paths: ["costOfRevenue", "costOfGoodsSold"],
+    kind: "largeCurrency",
+  },
   { label: "Lucro bruto", paths: ["grossProfit"], kind: "largeCurrency" },
-  { label: "Despesas operacionais", paths: ["totalOperatingExpenses", "operatingExpenses"], kind: "largeCurrency" },
+  {
+    label: "Despesas operacionais",
+    paths: ["totalOperatingExpenses", "operatingExpenses"],
+    kind: "largeCurrency",
+  },
   { label: "EBIT", paths: ["ebit", "operatingIncome"], kind: "largeCurrency" },
   { label: "EBITDA", paths: ["ebitda"], kind: "largeCurrency" },
-  { label: "Resultado financeiro", paths: ["netInterestIncome", "interestExpense"], kind: "largeCurrency" },
-  { label: "Lucro antes dos impostos", paths: ["incomeBeforeTax"], kind: "largeCurrency" },
-  { label: "Imposto de renda", paths: ["incomeTaxExpense"], kind: "largeCurrency" },
-  { label: "Lucro líquido", paths: ["netIncome", "netIncomeApplicableToCommonShares"], kind: "largeCurrency" }
+  {
+    label: "Resultado financeiro",
+    paths: ["netInterestIncome", "interestExpense"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Lucro antes dos impostos",
+    paths: ["incomeBeforeTax"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Imposto de renda",
+    paths: ["incomeTaxExpense"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Lucro líquido",
+    paths: ["netIncome", "netIncomeApplicableToCommonShares"],
+    kind: "largeCurrency",
+  },
 ] as const;
 
 const cashFlowDefinitions = [
-  { label: "Fluxo operacional", paths: ["totalCashFromOperatingActivities", "operatingCashFlow"], kind: "largeCurrency" },
+  {
+    label: "Fluxo operacional",
+    paths: ["totalCashFromOperatingActivities", "operatingCashFlow"],
+    kind: "largeCurrency",
+  },
   { label: "Capex", paths: ["capitalExpenditures"], kind: "largeCurrency" },
   { label: "Fluxo livre", paths: ["freeCashFlow"], kind: "largeCurrency" },
-  { label: "Dividendos pagos", paths: ["dividendsPaid"], kind: "largeCurrency" },
-  { label: "Recompra de ações", paths: ["repurchaseOfStock"], kind: "largeCurrency" },
-  { label: "Variação líquida de caixa", paths: ["changeInCash", "netChangeInCash"], kind: "largeCurrency" },
-  { label: "Caixa inicial", paths: ["beginningCashPosition"], kind: "largeCurrency" },
-  { label: "Caixa final", paths: ["endCashPosition", "endingCashPosition"], kind: "largeCurrency" }
+  {
+    label: "Dividendos pagos",
+    paths: ["dividendsPaid"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Recompra de ações",
+    paths: ["repurchaseOfStock"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Variação líquida de caixa",
+    paths: ["changeInCash", "netChangeInCash"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Caixa inicial",
+    paths: ["beginningCashPosition"],
+    kind: "largeCurrency",
+  },
+  {
+    label: "Caixa final",
+    paths: ["endCashPosition", "endingCashPosition"],
+    kind: "largeCurrency",
+  },
 ] as const;
 
 function currentIndicatorTable(
@@ -309,7 +489,7 @@ function currentIndicatorTable(
   classicQuote: BrapiAsset | null,
   statisticsHistory: BrapiAsset | null,
   financialDataHistory: BrapiAsset | null,
-  yahooSummary: BrapiAsset | null
+  yahooSummary: BrapiAsset | null,
 ): AnalysisTable {
   const currentYear = String(new Date().getFullYear());
   const columns = getYearColumns();
@@ -317,35 +497,55 @@ function currentIndicatorTable(
     ...(dataOf(classicQuote) ?? {}),
     ...(dataOf(yahooSummary) ?? {}),
     ...(dataOf(statistics) ?? {}),
-    ...(dataOf(financialData) ?? {})
+    ...(dataOf(financialData) ?? {}),
   };
 
   const historyRows = [
-    ...arrayFromPossible(dataOf(statisticsHistory) ?? statisticsHistory, ["history", "data.history", "statements", "items"]),
-    ...arrayFromPossible(dataOf(financialDataHistory) ?? financialDataHistory, ["history", "data.history", "statements", "items"])
+    ...arrayFromPossible(dataOf(statisticsHistory) ?? statisticsHistory, [
+      "history",
+      "data.history",
+      "statements",
+      "items",
+    ]),
+    ...arrayFromPossible(dataOf(financialDataHistory) ?? financialDataHistory, [
+      "history",
+      "data.history",
+      "statements",
+      "items",
+    ]),
   ];
 
   const rows = indicatorDefinitions.map((definition) => {
     const values = columns.map((column) => {
       if (column === currentYear) {
-        return formatByKind(firstNumber(currentData, definition.paths), definition.kind) ?? "—";
+        return (
+          formatByKind(
+            firstNumber(currentData, definition.paths),
+            definition.kind,
+          ) ?? "—"
+        );
       }
 
-      const row = historyRows.find((item) => yearFromRow(item) === Number(column));
+      const row = historyRows.find(
+        (item) => yearFromRow(item) === Number(column),
+      );
 
-      return row ? formatByKind(firstNumber(row, definition.paths), definition.kind) ?? "—" : "—";
+      return row
+        ? (formatByKind(firstNumber(row, definition.paths), definition.kind) ??
+            "—")
+        : "—";
     });
 
     return {
       label: definition.label,
-      values
+      values,
     };
   });
 
   return {
     columns,
     rows,
-    emptyMessage: "Indicadores anuais não retornados pela API."
+    emptyMessage: "Indicadores anuais não retornados pela API.",
   };
 }
 
@@ -371,150 +571,458 @@ function buildAnalysis(input: {
         input.classicQuote,
         input.statisticsHistory,
         input.financialDataHistory,
-        input.yahooSummary
+        input.yahooSummary,
       ),
       quarterly: {
         columns: ["Atual", "—", "—", "—", "—", "—"],
         rows: [],
-        emptyMessage: "Indicadores trimestrais não retornados pela API."
-      }
+        emptyMessage: "Indicadores trimestrais não retornados pela API.",
+      },
     },
     balanceSheet: {
       annual: buildTable({
         source: input.balanceAnnual,
         period: "annual",
         firstColumn: "Atual",
-        rowKeys: ["statements", "balanceSheetHistory", "balanceSheetStatements", "data.statements"],
+        rowKeys: [
+          "statements",
+          "balanceSheetHistory",
+          "balanceSheetStatements",
+          "data.statements",
+        ],
         definitions: balanceDefinitions,
-        emptyMessage: "Balanço patrimonial anual não retornado pela API."
+        emptyMessage: "Balanço patrimonial anual não retornado pela API.",
       }),
       quarterly: buildTable({
         source: input.balanceQuarterly,
         period: "quarterly",
         firstColumn: "Atual",
-        rowKeys: ["statements", "balanceSheetHistoryQuarterly", "balanceSheetStatements", "data.statements"],
+        rowKeys: [
+          "statements",
+          "balanceSheetHistoryQuarterly",
+          "balanceSheetStatements",
+          "data.statements",
+        ],
         definitions: balanceDefinitions,
-        emptyMessage: "Balanço patrimonial trimestral não retornado pela API."
-      })
+        emptyMessage: "Balanço patrimonial trimestral não retornado pela API.",
+      }),
     },
     incomeStatement: {
       annual: buildTable({
         source: input.incomeAnnual,
         period: "annual",
         firstColumn: "Atual",
-        rowKeys: ["statements", "incomeStatementHistory", "incomeStatementStatements", "data.statements"],
+        rowKeys: [
+          "statements",
+          "incomeStatementHistory",
+          "incomeStatementStatements",
+          "data.statements",
+        ],
         definitions: incomeDefinitions,
-        emptyMessage: "DRE anual não retornada pela API."
+        emptyMessage: "DRE anual não retornada pela API.",
       }),
       quarterly: buildTable({
         source: input.incomeQuarterly,
         period: "quarterly",
         firstColumn: "Atual",
-        rowKeys: ["statements", "incomeStatementHistoryQuarterly", "incomeStatementStatements", "data.statements"],
+        rowKeys: [
+          "statements",
+          "incomeStatementHistoryQuarterly",
+          "incomeStatementStatements",
+          "data.statements",
+        ],
         definitions: incomeDefinitions,
-        emptyMessage: "DRE trimestral não retornada pela API."
-      })
+        emptyMessage: "DRE trimestral não retornada pela API.",
+      }),
     },
     cashFlow: {
       annual: buildTable({
         source: input.cashAnnual,
         period: "annual",
         firstColumn: "Atual",
-        rowKeys: ["statements", "cashflowStatementHistory", "cashFlowStatements", "data.statements"],
+        rowKeys: [
+          "statements",
+          "cashflowStatementHistory",
+          "cashFlowStatements",
+          "data.statements",
+        ],
         definitions: cashFlowDefinitions,
-        emptyMessage: "Fluxo de caixa anual não retornado pela API."
+        emptyMessage: "Fluxo de caixa anual não retornado pela API.",
       }),
       quarterly: buildTable({
         source: input.cashQuarterly,
         period: "quarterly",
         firstColumn: "Atual",
-        rowKeys: ["statements", "cashflowStatementHistoryQuarterly", "cashFlowStatements", "data.statements"],
+        rowKeys: [
+          "statements",
+          "cashflowStatementHistoryQuarterly",
+          "cashFlowStatements",
+          "data.statements",
+        ],
         definitions: cashFlowDefinitions,
-        emptyMessage: "Fluxo de caixa trimestral não retornado pela API."
-      })
-    }
+        emptyMessage: "Fluxo de caixa trimestral não retornado pela API.",
+      }),
+    },
   };
 }
 
-function oneColumnTable(rows: Array<{ label: string; value: string | null }>, emptyMessage: string): AnalysisTable {
+function oneColumnTable(
+  rows: Array<{ label: string; value: string | null }>,
+  emptyMessage: string,
+): AnalysisTable {
   const validRows = rows.map((row) => ({
     label: row.label,
-    values: [row.value ?? "—"]
+    values: [row.value ?? "—"],
   }));
 
   return {
     columns: ["Atual"],
     rows: validRows,
-    emptyMessage
+    emptyMessage,
   };
 }
 
-function buildFiiAnalysis(data: Record<string, unknown>, price: number | null, marketCap: number | null, sharesOutstanding: number | null): FundamentalAnalysisData {
+function buildFiiAnalysis(
+  data: Record<string, unknown>,
+  price: number | null,
+  marketCap: number | null,
+  sharesOutstanding: number | null,
+): FundamentalAnalysisData {
   return {
     indicators: {
-      annual: oneColumnTable([
-        { label: "Div. Yield", value: formatByKind(firstNumber(data, ["dividendYield", "trailingAnnualDividendYield"]), "percent") },
-        { label: "P/VP", value: formatByKind(firstNumber(data, ["priceToBook"]), "number") },
-        { label: "VP/Cota", value: formatByKind(firstNumber(data, ["vpPerShare", "bookValue"]), "currency") },
-        { label: "Dividendo/Cota", value: formatByKind(firstNumber(data, ["dividendPerShare", "dividendRate"]), "currency") },
-        { label: "FFO Yield", value: formatByKind(firstNumber(data, ["ffoYield"]), "percent") },
-        { label: "FFO/Cota", value: formatByKind(firstNumber(data, ["ffoPerShare"]), "currency") },
-        { label: "Valor de mercado", value: formatByKind(marketCap, "largeCurrency") },
-        { label: "Nº de cotas", value: formatByKind(sharesOutstanding, "integer") },
-        { label: "Cotação", value: formatByKind(price, "currency") }
-      ], "Indicadores de FII não retornados pelas fontes públicas."),
+      annual: oneColumnTable(
+        [
+          {
+            label: "Div. Yield",
+            value: formatByKind(
+              firstNumber(data, [
+                "dividendYield",
+                "trailingAnnualDividendYield",
+              ]),
+              "percent",
+            ),
+          },
+          {
+            label: "P/VP",
+            value: formatByKind(firstNumber(data, ["priceToBook"]), "number"),
+          },
+          {
+            label: "VP/Cota",
+            value: formatByKind(
+              firstNumber(data, ["vpPerShare", "bookValue"]),
+              "currency",
+            ),
+          },
+          {
+            label: "Dividendo/Cota",
+            value: formatByKind(
+              firstNumber(data, ["dividendPerShare", "dividendRate"]),
+              "currency",
+            ),
+          },
+          {
+            label: "FFO Yield",
+            value: formatByKind(firstNumber(data, ["ffoYield"]), "percent"),
+          },
+          {
+            label: "FFO/Cota",
+            value: formatByKind(firstNumber(data, ["ffoPerShare"]), "currency"),
+          },
+          {
+            label: "Valor de mercado",
+            value: formatByKind(marketCap, "largeCurrency"),
+          },
+          {
+            label: "Nº de cotas",
+            value: formatByKind(sharesOutstanding, "integer"),
+          },
+          { label: "Cotação", value: formatByKind(price, "currency") },
+        ],
+        "Indicadores de FII não retornados pelas fontes públicas.",
+      ),
       quarterly: {
         columns: ["Atual"],
         rows: [],
-        emptyMessage: "Indicadores trimestrais de FII não disponíveis nas fontes atuais."
-      }
+        emptyMessage:
+          "Indicadores trimestrais de FII não disponíveis nas fontes atuais.",
+      },
     },
     balanceSheet: {
-      annual: oneColumnTable([
-        { label: "Patrimônio líquido", value: formatByKind(firstNumber(data, ["patrimony", "equity.total"]), "largeCurrency") },
-        { label: "Ativos", value: formatByKind(firstNumber(data, ["assets", "assetsData.total"]), "largeCurrency") },
-        { label: "Valor patrimonial por cota", value: formatByKind(firstNumber(data, ["vpPerShare", "bookValue"]), "currency") },
-        { label: "Nº de cotas", value: formatByKind(sharesOutstanding, "integer") }
-      ], "Balanço do FII não disponível nas fontes atuais."),
+      annual: oneColumnTable(
+        [
+          {
+            label: "Patrimônio líquido",
+            value: formatByKind(
+              firstNumber(data, ["patrimony", "equity.total"]),
+              "largeCurrency",
+            ),
+          },
+          {
+            label: "Ativos",
+            value: formatByKind(
+              firstNumber(data, ["assets", "assetsData.total"]),
+              "largeCurrency",
+            ),
+          },
+          {
+            label: "Valor patrimonial por cota",
+            value: formatByKind(
+              firstNumber(data, ["vpPerShare", "bookValue"]),
+              "currency",
+            ),
+          },
+          {
+            label: "Nº de cotas",
+            value: formatByKind(sharesOutstanding, "integer"),
+          },
+        ],
+        "Balanço do FII não disponível nas fontes atuais.",
+      ),
       quarterly: {
         columns: ["Atual"],
         rows: [],
-        emptyMessage: "Balanço trimestral de FII não disponível nas fontes atuais."
-      }
+        emptyMessage:
+          "Balanço trimestral de FII não disponível nas fontes atuais.",
+      },
     },
     incomeStatement: {
-      annual: oneColumnTable([
-        { label: "Receita 12m", value: formatByKind(firstNumber(data, ["revenue12m", "fiiResult.revenue12m"]), "largeCurrency") },
-        { label: "Rendimento distribuído 12m", value: formatByKind(firstNumber(data, ["distributedIncome12m", "fiiResult.distributedIncome12m"]), "largeCurrency") }
-      ], "Resultado do FII não disponível nas fontes atuais."),
+      annual: oneColumnTable(
+        [
+          {
+            label: "Receita 12m",
+            value: formatByKind(
+              firstNumber(data, ["revenue12m", "fiiResult.revenue12m"]),
+              "largeCurrency",
+            ),
+          },
+          {
+            label: "Rendimento distribuído 12m",
+            value: formatByKind(
+              firstNumber(data, [
+                "distributedIncome12m",
+                "fiiResult.distributedIncome12m",
+              ]),
+              "largeCurrency",
+            ),
+          },
+        ],
+        "Resultado do FII não disponível nas fontes atuais.",
+      ),
       quarterly: {
         columns: ["Atual"],
         rows: [],
-        emptyMessage: "Resultado trimestral de FII não disponível nas fontes atuais."
-      }
+        emptyMessage:
+          "Resultado trimestral de FII não disponível nas fontes atuais.",
+      },
     },
     cashFlow: {
-      annual: oneColumnTable([
-        { label: "Cap rate", value: formatByKind(firstNumber(data, ["capRate", "fiiRealEstate.capRate"]), "percent") },
-        { label: "Vacância média", value: formatByKind(firstNumber(data, ["vacancy", "fiiRealEstate.vacancy"]), "percent") },
-        { label: "Quantidade de imóveis", value: formatByKind(firstNumber(data, ["propertiesCount", "fiiRealEstate.propertiesCount"]), "integer") },
-        { label: "Área (m²)", value: formatByKind(firstNumber(data, ["areaM2", "fiiRealEstate.areaM2"]), "integer") }
-      ], "Dados imobiliários do FII não disponíveis nas fontes atuais."),
+      annual: oneColumnTable(
+        [
+          {
+            label: "Cap rate",
+            value: formatByKind(
+              firstNumber(data, ["capRate", "fiiRealEstate.capRate"]),
+              "percent",
+            ),
+          },
+          {
+            label: "Vacância média",
+            value: formatByKind(
+              firstNumber(data, ["vacancy", "fiiRealEstate.vacancy"]),
+              "percent",
+            ),
+          },
+          {
+            label: "Quantidade de imóveis",
+            value: formatByKind(
+              firstNumber(data, [
+                "propertiesCount",
+                "fiiRealEstate.propertiesCount",
+              ]),
+              "integer",
+            ),
+          },
+          {
+            label: "Área (m²)",
+            value: formatByKind(
+              firstNumber(data, ["areaM2", "fiiRealEstate.areaM2"]),
+              "integer",
+            ),
+          },
+        ],
+        "Dados imobiliários do FII não disponíveis nas fontes atuais.",
+      ),
       quarterly: {
         columns: ["Atual"],
         rows: [],
-        emptyMessage: "Dados trimestrais de FII não disponíveis nas fontes atuais."
-      }
-    }
+        emptyMessage:
+          "Dados trimestrais de FII não disponíveis nas fontes atuais.",
+      },
+    },
   };
 }
 
-function extractDividends(dividends: BrapiAsset | null, classicQuote: BrapiAsset | null): DividendEvent[] {
+
+function hasAnalysisTableData(table: AnalysisTable): boolean {
+  return table.rows.some((row) =>
+    row.values.some((value) => {
+      const normalized = String(value ?? "").trim();
+      return normalized !== "" && normalized !== "—" && normalized !== "Não disponível";
+    }),
+  );
+}
+
+function chooseAnalysisTable(primary: AnalysisTable, fallback: AnalysisTable): AnalysisTable {
+  const primaryScore = primary.rows.reduce(
+    (score, row) => score + row.values.filter((value) => value !== "—" && value !== "Não disponível").length,
+    0,
+  );
+  const fallbackScore = fallback.rows.reduce(
+    (score, row) => score + row.values.filter((value) => value !== "—" && value !== "Não disponível").length,
+    0,
+  );
+
+  return fallbackScore > primaryScore ? fallback : primary;
+}
+
+function mergeSnapshotAnalysis(
+  primary: FundamentalAnalysisData,
+  fallback: FundamentalAnalysisData,
+): FundamentalAnalysisData {
+  return {
+    indicators: {
+      annual: chooseAnalysisTable(primary.indicators.annual, fallback.indicators.annual),
+      quarterly: chooseAnalysisTable(primary.indicators.quarterly, fallback.indicators.quarterly),
+    },
+    balanceSheet: {
+      annual: chooseAnalysisTable(primary.balanceSheet.annual, fallback.balanceSheet.annual),
+      quarterly: chooseAnalysisTable(primary.balanceSheet.quarterly, fallback.balanceSheet.quarterly),
+    },
+    incomeStatement: {
+      annual: chooseAnalysisTable(primary.incomeStatement.annual, fallback.incomeStatement.annual),
+      quarterly: chooseAnalysisTable(primary.incomeStatement.quarterly, fallback.incomeStatement.quarterly),
+    },
+    cashFlow: {
+      annual: chooseAnalysisTable(primary.cashFlow.annual, fallback.cashFlow.annual),
+      quarterly: chooseAnalysisTable(primary.cashFlow.quarterly, fallback.cashFlow.quarterly),
+    },
+  };
+}
+
+function buildStockSnapshotAnalysis(
+  data: Record<string, unknown>,
+  price: number | null,
+  marketCap: number | null,
+  sharesOutstanding: number | null,
+): FundamentalAnalysisData {
+  const totalDebt = firstNumber(data, ["totalDebt", "grossDebt"]);
+  const totalCash = firstNumber(data, ["totalCash", "cash"]);
+  const netDebt =
+    firstNumber(data, ["netDebt"]) ??
+    (totalDebt !== null ? totalDebt - (totalCash ?? 0) : null);
+
+  return {
+    indicators: {
+      annual: oneColumnTable(
+        [
+          { label: "P/L", value: formatByKind(firstNumber(data, ["priceEarnings", "trailingPE", "peRatio"]), "number") },
+          { label: "P/VP", value: formatByKind(firstNumber(data, ["priceToBook", "pbRatio"]), "number") },
+          { label: "P/Receita", value: formatByKind(firstNumber(data, ["priceToSales", "priceSales"]), "number") },
+          { label: "P/EBIT", value: formatByKind(firstNumber(data, ["priceToEbit", "pEbit"]), "number") },
+          { label: "EV/EBITDA", value: formatByKind(firstNumber(data, ["enterpriseToEbitda", "evToEbitda"]), "number") },
+          { label: "EV/EBIT", value: formatByKind(firstNumber(data, ["enterpriseToEbit", "evToEbit"]), "number") },
+          { label: "Dividend Yield", value: formatByKind(firstNumber(data, ["dividendYield", "trailingAnnualDividendYield"]), "percent") },
+          { label: "ROE", value: formatByKind(firstNumber(data, ["returnOnEquity", "roe"]), "percent") },
+          { label: "ROIC", value: formatByKind(firstNumber(data, ["returnOnInvestedCapital", "roic"]), "percent") },
+          { label: "Margem EBIT", value: formatByKind(firstNumber(data, ["operatingMargins", "ebitMargin"]), "percent") },
+          { label: "Margem líquida", value: formatByKind(firstNumber(data, ["profitMargins", "netMargin"]), "percent") },
+          { label: "VPA", value: formatByKind(firstNumber(data, ["bookValue", "bookValuePerShare"]), "currency") },
+          { label: "LPA", value: formatByKind(firstNumber(data, ["earningsPerShare", "lpa"]), "currency") },
+          { label: "Valor de mercado", value: formatByKind(marketCap, "largeCurrency") },
+          { label: "Nº de ações", value: formatByKind(sharesOutstanding, "integer") },
+          { label: "Cotação", value: formatByKind(price, "currency") },
+        ],
+        "Indicadores em consolidação para este ativo.",
+      ),
+      quarterly: {
+        columns: ["Atual"],
+        rows: [],
+        emptyMessage: "Indicadores trimestrais ainda não disponíveis para este ativo.",
+      },
+    },
+    balanceSheet: {
+      annual: oneColumnTable(
+        [
+          { label: "Ativo total", value: formatByKind(firstNumber(data, ["totalAssets", "assets"]), "largeCurrency") },
+          { label: "Patrimônio líquido", value: formatByKind(firstNumber(data, ["totalEquity", "patrimony", "equity.total"]), "largeCurrency") },
+          { label: "Dívida bruta", value: formatByKind(totalDebt, "largeCurrency") },
+          { label: "Dívida líquida", value: formatByKind(netDebt, "largeCurrency") },
+          { label: "Caixa e equivalentes", value: formatByKind(totalCash, "largeCurrency") },
+          { label: "Liquidez corrente", value: formatByKind(firstNumber(data, ["currentRatio"]), "number") },
+        ],
+        "Balanço patrimonial em consolidação para este ativo.",
+      ),
+      quarterly: {
+        columns: ["Atual"],
+        rows: [],
+        emptyMessage: "Balanço trimestral ainda não disponível para este ativo.",
+      },
+    },
+    incomeStatement: {
+      annual: oneColumnTable(
+        [
+          { label: "Receita 12m", value: formatByKind(firstNumber(data, ["revenue12m", "revenue", "totalRevenue"]), "largeCurrency") },
+          { label: "EBIT 12m", value: formatByKind(firstNumber(data, ["ebit", "operatingIncome"]), "largeCurrency") },
+          { label: "Lucro líquido 12m", value: formatByKind(firstNumber(data, ["netIncome"]), "largeCurrency") },
+          { label: "Margem EBIT", value: formatByKind(firstNumber(data, ["operatingMargins", "ebitMargin"]), "percent") },
+          { label: "Margem líquida", value: formatByKind(firstNumber(data, ["profitMargins", "netMargin"]), "percent") },
+          { label: "Crescimento receita 5a", value: formatByKind(firstNumber(data, ["revenueGrowth5y"]), "percent") },
+        ],
+        "DRE em consolidação para este ativo.",
+      ),
+      quarterly: {
+        columns: ["Atual"],
+        rows: [],
+        emptyMessage: "DRE trimestral ainda não disponível para este ativo.",
+      },
+    },
+    cashFlow: {
+      annual: oneColumnTable(
+        [
+          { label: "Valor da firma", value: formatByKind(firstNumber(data, ["enterpriseValue"]), "largeCurrency") },
+          { label: "Dív. líquida/EBITDA", value: formatByKind(firstNumber(data, ["netDebtToEbitda", "debtToEbitda"]), "number") },
+          { label: "Volume médio 2m", value: formatByKind(firstNumber(data, ["averageVolume", "regularMarketVolume"]), "integer") },
+        ],
+        "Fluxo de caixa em consolidação para este ativo.",
+      ),
+      quarterly: {
+        columns: ["Atual"],
+        rows: [],
+        emptyMessage: "Fluxo de caixa trimestral ainda não disponível para este ativo.",
+      },
+    },
+  };
+}
+
+function extractDividends(
+  dividends: BrapiAsset | null,
+  classicQuote: BrapiAsset | null,
+): DividendEvent[] {
   const data = dataOf(dividends) ?? dividends;
   const classic = dataOf(classicQuote) ?? classicQuote;
   const events = [
-    ...arrayFromPossible(data, ["dividends", "events", "cashDividends", "data.dividends", "data.events"]),
-    ...arrayFromPossible(classic, ["dividendsData.cashDividends", "cashDividends", "dividends"])
+    ...arrayFromPossible(data, [
+      "dividends",
+      "events",
+      "cashDividends",
+      "data.dividends",
+      "data.events",
+    ]),
+    ...arrayFromPossible(classic, [
+      "dividendsData.cashDividends",
+      "cashDividends",
+      "dividends",
+    ]),
   ];
 
   return events.slice(0, 12).map((event) => {
@@ -543,15 +1051,29 @@ function extractDividends(dividends: BrapiAsset | null, classicQuote: BrapiAsset
       value: value === null ? "Não disponível" : formatCurrency(value),
       comDate: formatDate(comDate),
       paymentDate: formatDate(paymentDate),
-      status: "Não informado"
+      status: "Não informado",
     };
   });
 }
 
-function dividendCashLast12Months(dividends: BrapiAsset | null, classicQuote: BrapiAsset | null, referenceDate?: string | null): number | null {
+function dividendCashLast12Months(
+  dividends: BrapiAsset | null,
+  classicQuote: BrapiAsset | null,
+  referenceDate?: string | null,
+): number | null {
   const events = [
-    ...arrayFromPossible(dataOf(dividends) ?? dividends, ["dividends", "events", "cashDividends", "data.dividends", "data.events"]),
-    ...arrayFromPossible(dataOf(classicQuote) ?? classicQuote, ["dividendsData.cashDividends", "cashDividends", "dividends"])
+    ...arrayFromPossible(dataOf(dividends) ?? dividends, [
+      "dividends",
+      "events",
+      "cashDividends",
+      "data.dividends",
+      "data.events",
+    ]),
+    ...arrayFromPossible(dataOf(classicQuote) ?? classicQuote, [
+      "dividendsData.cashDividends",
+      "cashDividends",
+      "dividends",
+    ]),
   ];
 
   if (!events.length) return null;
@@ -590,7 +1112,12 @@ function dividendCashLast12Months(dividends: BrapiAsset | null, classicQuote: Br
 
 function translateDividendType(type: string): string {
   const normalized = type.toLowerCase();
-  if (normalized.includes("jcp") || normalized.includes("interest") || normalized.includes("juros")) return "JCP";
+  if (
+    normalized.includes("jcp") ||
+    normalized.includes("interest") ||
+    normalized.includes("juros")
+  )
+    return "JCP";
   if (normalized.includes("dividend")) return "Dividendo";
   if (normalized.includes("rend")) return "Rendimento";
   return type;
@@ -621,7 +1148,9 @@ function normalizeHistoryDate(value: unknown): string | null {
 
     const brazilianDate = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (brazilianDate) {
-      return new Date(`${brazilianDate[3]}-${brazilianDate[2]}-${brazilianDate[1]}T03:00:00.000Z`).toISOString();
+      return new Date(
+        `${brazilianDate[3]}-${brazilianDate[2]}-${brazilianDate[1]}T03:00:00.000Z`,
+      ).toISOString();
     }
 
     return null;
@@ -630,15 +1159,32 @@ function normalizeHistoryDate(value: unknown): string | null {
   return null;
 }
 
-function extractHistory(historical: BrapiAsset | null, classicQuote: BrapiAsset | null, yahooHistory: BrapiAsset | null): StockHistoryPoint[] {
+function extractHistory(
+  historical: BrapiAsset | null,
+  classicQuote: BrapiAsset | null,
+  yahooHistory: BrapiAsset | null,
+): StockHistoryPoint[] {
   const historicalData = dataOf(historical) ?? historical;
   const classic = dataOf(classicQuote) ?? classicQuote;
   const yahoo = dataOf(yahooHistory) ?? yahooHistory;
 
   const points = [
-    ...arrayFromPossible(historicalData, ["historicalDataPrice", "historical", "prices", "data.historicalDataPrice"]),
-    ...arrayFromPossible(classic, ["historicalDataPrice", "historical", "prices"]),
-    ...arrayFromPossible(yahoo, ["historicalDataPrice", "historical", "prices"])
+    ...arrayFromPossible(historicalData, [
+      "historicalDataPrice",
+      "historical",
+      "prices",
+      "data.historicalDataPrice",
+    ]),
+    ...arrayFromPossible(classic, [
+      "historicalDataPrice",
+      "historical",
+      "prices",
+    ]),
+    ...arrayFromPossible(yahoo, [
+      "historicalDataPrice",
+      "historical",
+      "prices",
+    ]),
   ];
 
   const mapped = points
@@ -661,7 +1207,7 @@ function extractHistory(historical: BrapiAsset | null, classicQuote: BrapiAsset 
 
       return {
         date,
-        close
+        close,
       };
     })
     .filter((point): point is StockHistoryPoint => Boolean(point))
@@ -675,27 +1221,41 @@ function extractHistory(historical: BrapiAsset | null, classicQuote: BrapiAsset 
   return Array.from(unique.values());
 }
 
-function variationBetween(current: number | null, past: number | null): number | null {
+function variationBetween(
+  current: number | null,
+  past: number | null,
+): number | null {
   if (current === null || past === null || past === 0) return null;
-  return ((current / past) - 1) * 100;
+  return (current / past - 1) * 100;
 }
 
-function pointBeforeOrAt(history: StockHistoryPoint[], target: Date): StockHistoryPoint | null {
+function pointBeforeOrAt(
+  history: StockHistoryPoint[],
+  target: Date,
+): StockHistoryPoint | null {
   const eligible = history.filter((point) => new Date(point.date) <= target);
   return eligible[eligible.length - 1] ?? null;
 }
 
-function firstPointOfYear(history: StockHistoryPoint[], year: number): StockHistoryPoint | null {
-  return history.find((point) => new Date(point.date).getFullYear() === year) ?? null;
+function firstPointOfYear(
+  history: StockHistoryPoint[],
+  year: number,
+): StockHistoryPoint | null {
+  return (
+    history.find((point) => new Date(point.date).getFullYear() === year) ?? null
+  );
 }
 
-function buildOscillation(label: string, value: number | null): StockOscillation {
+function buildOscillation(
+  label: string,
+  value: number | null,
+): StockOscillation {
   if (value === null || Number.isNaN(value)) {
     return {
       label,
       value: "Não disponível",
       status: "unavailable",
-      description: ""
+      description: "",
     };
   }
 
@@ -703,12 +1263,18 @@ function buildOscillation(label: string, value: number | null): StockOscillation
     label,
     value: `${value > 0 ? "+" : ""}${formatPlainPercent(value)}`,
     status: value > 0 ? "positive" : value < 0 ? "negative" : "neutral",
-    description: ""
+    description: "",
   };
 }
 
-function buildOscillations(history: StockHistoryPoint[], currentPrice: number | null, dayChangePercent: number | null): StockOscillation[] {
-  const sorted = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+function buildOscillations(
+  history: StockHistoryPoint[],
+  currentPrice: number | null,
+  dayChangePercent: number | null,
+): StockOscillation[] {
+  const sorted = [...history].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+  );
   const last = sorted[sorted.length - 1] ?? null;
   const current = currentPrice ?? last?.close ?? null;
   const lastDate = last ? new Date(last.date) : new Date();
@@ -724,17 +1290,30 @@ function buildOscillations(history: StockHistoryPoint[], currentPrice: number | 
   const values: StockOscillation[] = [
     buildOscillation("Dia", normalizePercentValue(dayChangePercent)),
     buildOscillation("5 dias", variationBetween(current, pastByDays(5))),
-    buildOscillation("Mês", variationBetween(current, firstPointOfYear(sorted, currentYear)?.close ?? pastByDays(31))),
+    buildOscillation(
+      "Mês",
+      variationBetween(
+        current,
+        firstPointOfYear(sorted, currentYear)?.close ?? pastByDays(31),
+      ),
+    ),
     buildOscillation("30 dias", variationBetween(current, pastByDays(30))),
-    buildOscillation("12 meses", variationBetween(current, pastByDays(365)))
+    buildOscillation("12 meses", variationBetween(current, pastByDays(365))),
   ];
 
   for (let year = currentYear; year >= currentYear - 4; year -= 1) {
     const first = firstPointOfYear(sorted, year);
-    const lastOfYear = sorted.filter((point) => new Date(point.date).getFullYear() === year).at(-1);
-    const end = year === currentYear ? current : lastOfYear?.close ?? null;
+    const lastOfYear = sorted
+      .filter((point) => new Date(point.date).getFullYear() === year)
+      .at(-1);
+    const end = year === currentYear ? current : (lastOfYear?.close ?? null);
 
-    values.push(buildOscillation(String(year), variationBetween(end, first?.close ?? null)));
+    values.push(
+      buildOscillation(
+        String(year),
+        variationBetween(end, first?.close ?? null),
+      ),
+    );
   }
 
   return values;
@@ -744,37 +1323,40 @@ function emptyAnalysis(): FundamentalAnalysisData {
   const empty = (message: string): AnalysisTable => ({
     columns: ["Atual", "—", "—", "—", "—", "—"],
     rows: [],
-    emptyMessage: message
+    emptyMessage: message,
   });
 
   return {
     indicators: {
       annual: empty("Indicadores não retornados pela API."),
-      quarterly: empty("Indicadores trimestrais não retornados pela API.")
+      quarterly: empty("Indicadores trimestrais não retornados pela API."),
     },
     balanceSheet: {
       annual: empty("Balanço anual não retornado pela API."),
-      quarterly: empty("Balanço trimestral não retornado pela API.")
+      quarterly: empty("Balanço trimestral não retornado pela API."),
     },
     incomeStatement: {
       annual: empty("DRE anual não retornada pela API."),
-      quarterly: empty("DRE trimestral não retornada pela API.")
+      quarterly: empty("DRE trimestral não retornada pela API."),
     },
     cashFlow: {
       annual: empty("Fluxo de caixa anual não retornado pela API."),
-      quarterly: empty("Fluxo de caixa trimestral não retornado pela API.")
-    }
+      quarterly: empty("Fluxo de caixa trimestral não retornado pela API."),
+    },
   };
 }
 
-export function createUnavailableStock(ticker: string, reason: string): StockData {
+export function createUnavailableStock(
+  ticker: string,
+  reason: string,
+): StockData {
   const normalized = ticker.trim().toUpperCase();
 
   return {
     ticker: normalized,
     companyName: normalized,
     sector: "Não disponível",
-    source: "brapi.dev",
+    source: "Base Foco Invest",
     updatedAt: formatDateTime(new Date().toISOString()),
     quote: {
       price: null,
@@ -785,18 +1367,18 @@ export function createUnavailableStock(ticker: string, reason: string): StockDat
       dayLow: null,
       previousClose: null,
       volume: null,
-      marketCap: null
+      marketCap: null,
     },
     dividendSummary: {
       yield12m: "Não disponível",
-      cash12m: "Não disponível"
+      cash12m: "Não disponível",
     },
     indicators: [
       indicator("P/L", null, "Relação entre preço e lucro por ação."),
       indicator("P/VP", null, "Relação entre preço e valor patrimonial."),
       indicator("DY 12m", null, "Dividend yield dos últimos 12 meses."),
       indicator("ROE", null, "Retorno sobre patrimônio líquido."),
-      indicator("ROIC", null, "Retorno sobre capital investido.")
+      indicator("ROIC", null, "Retorno sobre capital investido."),
     ],
     dayQuoteRows: [
       quoteRow("Abertura", null, "Preço de abertura."),
@@ -804,22 +1386,24 @@ export function createUnavailableStock(ticker: string, reason: string): StockDat
       quoteRow("Mínima", null, "Mínima do dia."),
       quoteRow("Fech. anterior", null, "Fechamento anterior."),
       quoteRow("Volume", null, "Volume negociado."),
-      quoteRow("Valor de mercado", null, "Valor de mercado.")
+      quoteRow("Valor de mercado", null, "Valor de mercado."),
     ],
-    companyInfo: [
-      { label: "Ticker", value: normalized },
-      { label: "Fonte", value: "brapi.dev" }
-    ],
+    companyInfo: [{ label: "Ticker", value: normalized }],
     history: [],
     oscillations: buildOscillations([], null, null),
     fundamentalAnalysis: emptyAnalysis(),
     dividends: [],
     related: [],
-    warnings: [reason, "Nenhum valor foi inventado nesta versão."]
+    warnings: [reason, "Nenhum valor foi inventado nesta versão."],
   };
 }
 
-function isFiiAsset(ticker: string, fundamentusData: Record<string, unknown>, profileData: Record<string, unknown>, quoteData: Record<string, unknown>): boolean {
+function isFiiAsset(
+  ticker: string,
+  fundamentusData: Record<string, unknown>,
+  profileData: Record<string, unknown>,
+  quoteData: Record<string, unknown>,
+): boolean {
   const kind =
     firstString(fundamentusData, ["kind"]) ??
     firstString(profileData, ["kind"]) ??
@@ -834,7 +1418,13 @@ function isFiiAsset(ticker: string, fundamentusData: Record<string, unknown>, pr
 
   if (sector.toLowerCase().includes("fundo")) return true;
 
-  const hasFiiMetrics = firstNumber(fundamentusData, ["ffoYield", "ffoPerShare", "vpPerShare", "propertiesCount"]) !== null;
+  const hasFiiMetrics =
+    firstNumber(fundamentusData, [
+      "ffoYield",
+      "ffoPerShare",
+      "vpPerShare",
+      "propertiesCount",
+    ]) !== null;
 
   return hasFiiMetrics && ticker.toUpperCase().endsWith("11");
 }
@@ -869,26 +1459,26 @@ export function mapBrapiToStockData(input: {
     ...fundamentusData,
     ...classicData,
     ...yahooQuoteData,
-    ...(dataOf(input.quote) ?? {})
+    ...(dataOf(input.quote) ?? {}),
   };
   const profileData = {
     ...fundamentusData,
     ...yahooQuoteData,
     ...yahooSummaryData,
-    ...(dataOf(input.profile) ?? {})
+    ...(dataOf(input.profile) ?? {}),
   };
   const statisticsData = {
     ...fundamentusData,
     ...classicData,
     ...yahooQuoteData,
     ...yahooSummaryData,
-    ...(dataOf(input.statistics) ?? {})
+    ...(dataOf(input.statistics) ?? {}),
   };
   const financialData = {
     ...fundamentusData,
     ...yahooQuoteData,
     ...yahooSummaryData,
-    ...(dataOf(input.financialData) ?? {})
+    ...(dataOf(input.financialData) ?? {}),
   };
 
   const symbol =
@@ -899,8 +1489,17 @@ export function mapBrapiToStockData(input: {
     input.ticker.trim().toUpperCase();
 
   const companyName =
-    cleanText(firstString(quoteData, ["shortName", "longName", "companyName"])) ??
-    cleanText(firstString(profileData, ["shortName", "longName", "name", "companyName"])) ??
+    cleanText(
+      firstString(quoteData, ["shortName", "longName", "companyName"]),
+    ) ??
+    cleanText(
+      firstString(profileData, [
+        "shortName",
+        "longName",
+        "name",
+        "companyName",
+      ]),
+    ) ??
     symbol;
 
   const fullName =
@@ -909,80 +1508,360 @@ export function mapBrapiToStockData(input: {
 
   const price = firstNumber(quoteData, ["regularMarketPrice", "price"]);
   const change = firstNumber(quoteData, ["regularMarketChange", "change"]);
-  const changePercent = firstNumber(quoteData, ["regularMarketChangePercent", "changePercent"]);
-  const sharesOutstanding = firstNumber(quoteData, ["sharesOutstanding", "shares", "nroCotas", "nroAcoes"]) ?? firstNumber(statisticsData, ["sharesOutstanding"]);
+  const changePercent = firstNumber(quoteData, [
+    "regularMarketChangePercent",
+    "changePercent",
+  ]);
+  const sharesOutstanding =
+    firstNumber(quoteData, [
+      "sharesOutstanding",
+      "shares",
+      "nroCotas",
+      "nroAcoes",
+    ]) ?? firstNumber(statisticsData, ["sharesOutstanding"]);
   const marketCap =
     firstNumber(quoteData, ["marketCap"]) ??
     firstNumber(statisticsData, ["marketCap"]) ??
-    (price !== null && sharesOutstanding !== null ? price * sharesOutstanding : null);
+    (price !== null && sharesOutstanding !== null
+      ? price * sharesOutstanding
+      : null);
   const volume = firstNumber(quoteData, ["regularMarketVolume", "volume"]);
   const high = firstNumber(quoteData, ["regularMarketDayHigh", "dayHigh"]);
   const low = firstNumber(quoteData, ["regularMarketDayLow", "dayLow"]);
   const open = firstNumber(quoteData, ["regularMarketOpen", "open"]);
-  const previousClose = firstNumber(quoteData, ["regularMarketPreviousClose", "previousClose"]);
-  const updatedAt = normalizeHistoryDate(firstString(quoteData, ["regularMarketTime", "updatedAt", "quoteDate"])) ?? firstString(quoteData, ["regularMarketTime", "updatedAt", "quoteDate"]);
+  const previousClose = firstNumber(quoteData, [
+    "regularMarketPreviousClose",
+    "previousClose",
+  ]);
+  const updatedAt =
+    normalizeHistoryDate(
+      firstString(quoteData, ["regularMarketTime", "updatedAt", "quoteDate"]),
+    ) ??
+    firstString(quoteData, ["regularMarketTime", "updatedAt", "quoteDate"]);
 
-  const dividendRateFromEvents = dividendCashLast12Months(input.dividends, input.classicQuote, updatedAt);
+  const isFii = isFiiAsset(
+    input.ticker,
+    fundamentusData,
+    profileData,
+    quoteData,
+  );
+  const dividendRateFromEvents = dividendCashLast12Months(
+    input.dividends,
+    input.classicQuote,
+    updatedAt,
+  );
+  const dividendYieldFromEvents =
+    price && dividendRateFromEvents
+      ? (dividendRateFromEvents / price) * 100
+      : null;
+  const plausibleDividendYieldFromEvents = plausibleDividendYield(
+    dividendYieldFromEvents,
+    isFii,
+  );
+  const sourceDividendYield = normalizePercentValue(
+    firstNumber(statisticsData, [
+      "dividendYield",
+      "trailingAnnualDividendYield",
+    ]) ??
+      firstNumber(quoteData, ["dividendYield", "trailingAnnualDividendYield"]),
+    isFii ? 35 : 25,
+  );
+  const dividendYield = plausibleDividendYieldFromEvents ?? sourceDividendYield;
+  const dividendRateFromSource =
+    firstNumber(statisticsData, [
+      "dividendRate",
+      "trailingAnnualDividendRate",
+      "dividendPerShare",
+    ]) ??
+    firstNumber(quoteData, [
+      "dividendRate",
+      "trailingAnnualDividendRate",
+      "dividendPerShare",
+    ]);
   const dividendRate =
-    firstNumber(statisticsData, ["dividendRate", "trailingAnnualDividendRate", "dividendPerShare"]) ??
-    firstNumber(quoteData, ["dividendRate", "trailingAnnualDividendRate", "dividendPerShare"]) ??
-    dividendRateFromEvents;
-  const dividendYieldFromEvents = price && dividendRateFromEvents ? (dividendRateFromEvents / price) * 100 : null;
-  const dividendYield =
-    firstNumber(statisticsData, ["dividendYield", "trailingAnnualDividendYield"]) ??
-    firstNumber(quoteData, ["dividendYield", "trailingAnnualDividendYield"]) ??
-    dividendYieldFromEvents;
-
-  const isFii = isFiiAsset(input.ticker, fundamentusData, profileData, quoteData);
+    plausibleDividendYieldFromEvents !== null
+      ? dividendRateFromEvents
+      : dividendRateFromSource;
 
   const keyIndicators = isFii
     ? [
-        indicator("Div. Yield", formatByKind(dividendYield, "percent"), "Dividend yield dos últimos 12 meses."),
-        indicator("P/VP", formatByKind(firstNumber(statisticsData, ["priceToBook", "pbRatio"]), "number"), "Preço da cota dividido pelo valor patrimonial por cota."),
-        indicator("VP/Cota", formatByKind(firstNumber(statisticsData, ["vpPerShare", "bookValue", "bookValuePerShare"]), "currency"), "Valor patrimonial por cota."),
-        indicator("Dividendo/Cota", dividendRate === null ? null : formatCurrency(dividendRate), "Proventos distribuídos por cota nos últimos 12 meses."),
-        indicator("Valor de mercado", formatLargeCurrency(marketCap) === "Não disponível" ? null : formatLargeCurrency(marketCap), "Valor de mercado do fundo."),
-        indicator("Nº de cotas", sharesOutstanding === null ? null : formatInteger(sharesOutstanding), "Quantidade de cotas.")
+        indicator(
+          "Div. Yield",
+          formatAlreadyPercentValue(dividendYield, 35),
+          "Dividend yield dos últimos 12 meses.",
+        ),
+        indicator(
+          "P/VP",
+          formatByKind(
+            firstNumber(statisticsData, ["priceToBook", "pbRatio"]),
+            "number",
+          ),
+          "Preço da cota dividido pelo valor patrimonial por cota.",
+        ),
+        indicator(
+          "VP/Cota",
+          formatByKind(
+            firstNumber(statisticsData, [
+              "vpPerShare",
+              "bookValue",
+              "bookValuePerShare",
+            ]),
+            "currency",
+          ),
+          "Valor patrimonial por cota.",
+        ),
+        indicator(
+          "Dividendo/Cota",
+          dividendRate === null ? null : formatCurrency(dividendRate),
+          "Proventos distribuídos por cota nos últimos 12 meses.",
+        ),
+        indicator(
+          "Valor de mercado",
+          formatLargeCurrency(marketCap) === "Não disponível"
+            ? null
+            : formatLargeCurrency(marketCap),
+          "Valor de mercado do fundo.",
+        ),
+        indicator(
+          "Nº de cotas",
+          sharesOutstanding === null ? null : formatInteger(sharesOutstanding),
+          "Quantidade de cotas.",
+        ),
       ]
     : [
-        indicator("P/L", formatByKind(firstNumber(statisticsData, ["priceEarnings", "trailingPE", "peRatio"]), "number"), "Relação entre preço e lucro por ação."),
-        indicator("P/VP", formatByKind(firstNumber(statisticsData, ["priceToBook", "pbRatio"]), "number"), "Relação entre preço e valor patrimonial."),
-        indicator("DY 12m", formatByKind(dividendYield, "percent"), "Dividend yield dos últimos 12 meses."),
-        indicator("ROE", formatByKind(firstNumber(financialData, ["returnOnEquity", "roe"]), "percent"), "Retorno sobre patrimônio líquido."),
-        indicator("ROIC", formatByKind(firstNumber(financialData, ["returnOnInvestedCapital", "roic"]), "percent"), "Retorno sobre capital investido."),
-        indicator("Mg. Líquida", formatByKind(firstNumber(financialData, ["profitMargins", "netMargin"]), "percent"), "Margem líquida da empresa."),
-        indicator("EV/EBITDA", formatByKind(firstNumber(statisticsData, ["enterpriseToEbitda", "evToEbitda"]), "number"), "Valor da firma dividido pelo EBITDA."),
-        indicator("Dív.Líq/EBITDA", formatByKind(firstNumber(financialData, ["netDebtToEbitda", "debtToEbitda"]), "number"), "Dívida líquida dividida pelo EBITDA."),
-        indicator("P/EBIT", formatByKind(firstNumber(statisticsData, ["priceToEbit", "pEbit"]), "number"), "Preço dividido pelo EBIT."),
-        indicator("VPA", formatByKind(firstNumber(statisticsData, ["bookValue", "bookValuePerShare"]), "currency"), "Valor patrimonial por ação."),
-        indicator("Valor de mercado", formatLargeCurrency(marketCap) === "Não disponível" ? null : formatLargeCurrency(marketCap), "Valor de mercado da empresa.")
+        indicator(
+          "P/L",
+          formatByKind(
+            firstNumber(statisticsData, [
+              "priceEarnings",
+              "trailingPE",
+              "peRatio",
+            ]),
+            "number",
+          ),
+          "Relação entre preço e lucro por ação.",
+        ),
+        indicator(
+          "P/VP",
+          formatByKind(
+            firstNumber(statisticsData, ["priceToBook", "pbRatio"]),
+            "number",
+          ),
+          "Relação entre preço e valor patrimonial.",
+        ),
+        indicator(
+          "DY 12m",
+          formatAlreadyPercentValue(dividendYield, 25),
+          "Dividend yield dos últimos 12 meses.",
+        ),
+        indicator(
+          "ROE",
+          formatByKind(
+            firstNumber(financialData, ["returnOnEquity", "roe"]),
+            "percent",
+          ),
+          "Retorno sobre patrimônio líquido.",
+        ),
+        indicator(
+          "ROIC",
+          formatByKind(
+            firstNumber(financialData, ["returnOnInvestedCapital", "roic"]),
+            "percent",
+          ),
+          "Retorno sobre capital investido.",
+        ),
+        indicator(
+          "Mg. Líquida",
+          formatByKind(
+            firstNumber(financialData, ["profitMargins", "netMargin"]),
+            "percent",
+          ),
+          "Margem líquida da empresa.",
+        ),
+        indicator(
+          "EV/EBITDA",
+          formatByKind(
+            firstNumber(statisticsData, ["enterpriseToEbitda", "evToEbitda"]),
+            "number",
+          ),
+          "Valor da firma dividido pelo EBITDA.",
+        ),
+        indicator(
+          "Dív.Líq/EBITDA",
+          formatByKind(
+            firstNumber(financialData, ["netDebtToEbitda", "debtToEbitda"]),
+            "number",
+          ),
+          "Dívida líquida dividida pelo EBITDA.",
+        ),
+        indicator(
+          "P/EBIT",
+          formatByKind(
+            firstNumber(statisticsData, ["priceToEbit", "pEbit"]),
+            "number",
+          ),
+          "Preço dividido pelo EBIT.",
+        ),
+        indicator(
+          "VPA",
+          formatByKind(
+            firstNumber(statisticsData, ["bookValue", "bookValuePerShare"]),
+            "currency",
+          ),
+          "Valor patrimonial por ação.",
+        ),
+        indicator(
+          "Valor de mercado",
+          formatLargeCurrency(marketCap) === "Não disponível"
+            ? null
+            : formatLargeCurrency(marketCap),
+          "Valor de mercado da empresa.",
+        ),
       ];
 
-  const dayQuoteRows = [
-    quoteRow("Abertura", formatCurrency(open) === "Não disponível" ? null : formatCurrency(open), "Preço de abertura do pregão."),
-    quoteRow("Máxima", formatCurrency(high) === "Não disponível" ? null : formatCurrency(high), "Máxima do dia."),
-    quoteRow("Mínima", formatCurrency(low) === "Não disponível" ? null : formatCurrency(low), "Mínima do dia."),
-    quoteRow("Fech. anterior", formatCurrency(previousClose) === "Não disponível" ? null : formatCurrency(previousClose), "Fechamento anterior informado pela fonte."),
-    quoteRow("Volume", formatInteger(volume) === "Não disponível" ? null : formatInteger(volume), "Volume negociado no pregão."),
-    quoteRow("Valor de mercado", formatLargeCurrency(marketCap) === "Não disponível" ? null : formatLargeCurrency(marketCap), "Valor de mercado baseado na cotação atual.")
-  ];
+  const hasIntradayQuote = open !== null || high !== null || low !== null;
+  const dayQuoteRows = hasIntradayQuote
+    ? [
+        quoteRow(
+          "Abertura",
+          formatCurrency(open) === "Não disponível"
+            ? null
+            : formatCurrency(open),
+          "Preço de abertura do pregão.",
+        ),
+        quoteRow(
+          "Máxima",
+          formatCurrency(high) === "Não disponível"
+            ? null
+            : formatCurrency(high),
+          "Máxima do dia.",
+        ),
+        quoteRow(
+          "Mínima",
+          formatCurrency(low) === "Não disponível" ? null : formatCurrency(low),
+          "Mínima do dia.",
+        ),
+        quoteRow(
+          "Fech. anterior",
+          formatCurrency(previousClose) === "Não disponível"
+            ? null
+            : formatCurrency(previousClose),
+          "Fechamento anterior informado pela fonte.",
+        ),
+        quoteRow(
+          "Volume",
+          formatInteger(volume) === "Não disponível"
+            ? null
+            : formatInteger(volume),
+          "Volume negociado no pregão.",
+        ),
+        quoteRow(
+          "Valor de mercado",
+          formatLargeCurrency(marketCap) === "Não disponível"
+            ? null
+            : formatLargeCurrency(marketCap),
+          "Valor de mercado baseado na cotação atual.",
+        ),
+      ]
+    : [
+        quoteRow(
+          "Último preço",
+          formatCurrency(price) === "Não disponível"
+            ? null
+            : formatCurrency(price),
+          "Último preço disponível.",
+        ),
+        quoteRow(
+          "Fech. anterior",
+          formatCurrency(previousClose) === "Não disponível"
+            ? null
+            : formatCurrency(previousClose),
+          "Fechamento anterior informado pela fonte.",
+        ),
+        quoteRow(
+          "Variação",
+          formatAlreadyPercentValue(changePercent, 100),
+          "Variação disponível para o período informado.",
+        ),
+        quoteRow(
+          "Volume",
+          formatInteger(volume) === "Não disponível"
+            ? null
+            : formatInteger(volume),
+          "Volume negociado no pregão.",
+        ),
+        quoteRow(
+          "Valor de mercado",
+          formatLargeCurrency(marketCap) === "Não disponível"
+            ? null
+            : formatLargeCurrency(marketCap),
+          "Valor de mercado baseado na cotação atual.",
+        ),
+      ];
 
   const companyInfo = isFii
     ? [
         { label: "Nome", value: fullName ?? companyName },
-        { label: "Segmento", value: cleanText(firstString(profileData, ["segment", "industry", "industria"])) ?? "Não disponível" },
-        { label: "Mandato", value: cleanText(firstString(profileData, ["mandate"])) ?? "Não disponível" },
-        { label: "Gestão", value: cleanText(firstString(profileData, ["management"])) ?? "Não disponível" },
-        { label: "Nº de cotas", value: sharesOutstanding === null ? "Não disponível" : formatInteger(sharesOutstanding) },
-        { label: "Moeda", value: cleanText(firstString(quoteData, ["currency"])) ?? "BRL" }
+        {
+          label: "Segmento",
+          value:
+            cleanText(
+              firstString(profileData, ["segment", "industry", "industria"]),
+            ) ?? "Não disponível",
+        },
+        {
+          label: "Mandato",
+          value:
+            cleanText(firstString(profileData, ["mandate"])) ??
+            "Não disponível",
+        },
+        {
+          label: "Gestão",
+          value:
+            cleanText(firstString(profileData, ["management"])) ??
+            "Não disponível",
+        },
+        {
+          label: "Nº de cotas",
+          value:
+            sharesOutstanding === null
+              ? "Não disponível"
+              : formatInteger(sharesOutstanding),
+        },
+        {
+          label: "Moeda",
+          value: cleanText(firstString(quoteData, ["currency"])) ?? "BRL",
+        },
       ]
     : [
         { label: "Razão social", value: fullName ?? "Não disponível" },
-        { label: "CNPJ", value: firstString(profileData, ["cnpj", "taxId"]) ?? "Não disponível" },
-        { label: "Setor", value: cleanText(firstString(profileData, ["sector", "setor"])) ?? "Não disponível" },
-        { label: "Indústria", value: firstString(profileData, ["industry", "industria"]) ?? "Não disponível" },
-        { label: "Site", value: cleanText(firstString(profileData, ["website", "site"])) ?? "Não disponível" },
-        { label: "Moeda", value: cleanText(firstString(quoteData, ["currency"])) ?? "BRL" }
+        {
+          label: "CNPJ",
+          value:
+            firstString(profileData, ["cnpj", "taxId"]) ?? "Não disponível",
+        },
+        {
+          label: "Setor",
+          value:
+            cleanText(firstString(profileData, ["sector", "setor"])) ??
+            "Não disponível",
+        },
+        {
+          label: "Indústria",
+          value:
+            firstString(profileData, ["industry", "industria"]) ??
+            "Não disponível",
+        },
+        {
+          label: "Site",
+          value:
+            cleanText(firstString(profileData, ["website", "site"])) ??
+            "Não disponível",
+        },
+        {
+          label: "Moeda",
+          value: cleanText(firstString(quoteData, ["currency"])) ?? "BRL",
+        },
       ];
 
   const baseAnalysis = buildAnalysis({
@@ -997,41 +1876,70 @@ export function mapBrapiToStockData(input: {
     incomeAnnual: input.incomeAnnual,
     incomeQuarterly: input.incomeQuarterly,
     cashAnnual: input.cashAnnual,
-    cashQuarterly: input.cashQuarterly
+    cashQuarterly: input.cashQuarterly,
   });
+
+  const stockSnapshotAnalysis = buildStockSnapshotAnalysis(
+    statisticsData,
+    price,
+    marketCap,
+    sharesOutstanding,
+  );
 
   const fundamentalAnalysis = isFii
     ? buildFiiAnalysis(statisticsData, price, marketCap, sharesOutstanding)
-    : baseAnalysis;
+    : mergeSnapshotAnalysis(baseAnalysis, stockSnapshotAnalysis);
 
-  const history = extractHistory(input.historical, input.classicQuote, input.yahooHistory);
+  const history = extractHistory(
+    input.historical,
+    input.classicQuote,
+    input.yahooHistory,
+  );
   const warnings = [];
 
   if (price === null) {
     warnings.push("Não foi possível obter cotação para este ticker.");
   }
 
-  const hasUsefulIndicators = keyIndicators.some((item) => item.value !== "Não disponível");
+  const hasUsefulIndicators = keyIndicators.some(
+    (item) => item.value !== "Não disponível",
+  );
   if (!hasUsefulIndicators) {
     warnings.push("Não foi possível obter indicadores para este ticker.");
   }
 
   if (!history.length) {
-    warnings.push("Não foi possível obter histórico de preço para montar o gráfico local e as oscilações.");
+    warnings.push(
+      "Não foi possível obter histórico de preço para montar o gráfico local e as oscilações.",
+    );
   }
 
-  if (!isFii && (!input.balanceAnnual || !input.incomeAnnual || !input.cashAnnual)) {
-    warnings.push("Alguns demonstrativos podem depender do plano ou da cobertura das fontes integradas.");
+  if (
+    !isFii &&
+    (!input.balanceAnnual || !input.incomeAnnual || !input.cashAnnual)
+  ) {
+    warnings.push(
+      "Alguns demonstrativos podem depender do plano ou da cobertura das fontes integradas.",
+    );
   }
 
   return {
     ticker: symbol,
     companyName,
     fullName: fullName ?? undefined,
-    sector: isFii ? "Fundos Imobiliários" : cleanText(firstString(profileData, ["sector", "setor"])) ?? "Não disponível",
-    subsector: cleanText(firstString(profileData, ["segment", "industry", "industria"])) ?? undefined,
-    logoUrl: firstString(quoteData, ["logourl"]) ?? firstString(profileData, ["logourl", "logo"]) ?? undefined,
-    source: input.fundamentus ? "brapi.dev + Yahoo/Fundamentus público" : input.yahooHistory || input.yahooSummary ? "brapi.dev + Yahoo complementar" : "brapi.dev",
+    sector: isFii
+      ? "Fundos Imobiliários"
+      : (cleanText(firstString(profileData, ["sector", "setor"])) ??
+        "Não disponível"),
+    subsector:
+      cleanText(
+        firstString(profileData, ["segment", "industry", "industria"]),
+      ) ?? undefined,
+    logoUrl:
+      firstString(quoteData, ["logourl"]) ??
+      firstString(profileData, ["logourl", "logo"]) ??
+      undefined,
+    source: "Base Foco Invest",
     updatedAt: formatDateTime(updatedAt),
     quote: {
       price,
@@ -1042,11 +1950,16 @@ export function mapBrapiToStockData(input: {
       dayLow: low,
       previousClose,
       volume,
-      marketCap
+      marketCap,
     },
     dividendSummary: {
-      yield12m: formatPercentValue(dividendYield) ?? "Não disponível",
-      cash12m: dividendRate === null ? "Não disponível" : `${formatCurrency(dividendRate)}/cota`
+      yield12m:
+        formatAlreadyPercentValue(dividendYield, isFii ? 35 : 25) ??
+        "Não disponível",
+      cash12m:
+        dividendRate === null
+          ? "Não disponível"
+          : `${formatCurrency(dividendRate)}/${isFii ? "cota" : "ação"}`,
     },
     indicators: keyIndicators,
     dayQuoteRows,
@@ -1056,6 +1969,6 @@ export function mapBrapiToStockData(input: {
     fundamentalAnalysis,
     dividends: extractDividends(input.dividends, input.classicQuote),
     related: [],
-    warnings
+    warnings,
   };
 }

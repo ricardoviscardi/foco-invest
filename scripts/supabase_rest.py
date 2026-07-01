@@ -143,16 +143,18 @@ class SupabaseRestClient:
         if response.status_code not in (200, 202, 204):
             raise RuntimeError(f"Erro ao apagar em {table}: HTTP {response.status_code} - {response.text[:1000]}")
 
-    def select_count(self, table: str) -> int:
+    def select_count(self, table: str, filters: dict[str, str] | None = None) -> int:
+        params = {"select": "id", "limit": "1", **(filters or {})}
+
         if self.use_local_api:
-            data = self._local_call({"op": "count", "table": table})
+            data = self._local_call({"op": "count", "table": table, "filters": filters or {}})
             count = data.get("count", 0)
             return int(count) if isinstance(count, (int, float)) else 0
 
         response = self._request(
             "GET",
             f"{self.config.rest_url}/{table}",
-            params={"select": "id", "limit": "1"},
+            params=params,
             headers={"Prefer": "count=exact"},
             timeout=30,
         )

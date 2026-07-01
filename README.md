@@ -1,32 +1,58 @@
+# Foco Invest — v1.53.10
+
+Versão com snapshot local de ações para testar a base completa em redes que bloqueiam o Supabase.
+
 # Foco Invest
 
 Projeto Next.js + TypeScript + Tailwind para consulta pública de ações brasileiras, fundamentos, indicadores, proventos e rankings.
 
 ## Versão atual
 
-**v1.53.3 — Correção de rede CVM no GitHub Actions**
+**v1.53.9 — saneamento estrutural da ligação de dados das páginas de ações**
 
-## Correção v1.53.3
+Esta versão corrige a ligação entre a página de ações e a base consolidada no Supabase, principalmente depois da migração das atualizações para GitHub Actions e dos problemas locais de rede/VPN.
 
-Esta versão ajusta a etapa de download da CVM no GitHub Actions.
-
-O erro observado foi:
+## Principais correções
 
 ```text
-Errno 101: Network is unreachable
+1. Leitura server-side do Supabase via node:https com IPv4 forçado.
+2. Melhor tolerância a SSL/rede local em desenvolvimento.
+3. Reforço na busca de demonstrativos, indicadores e dividendos.
+4. Reconstrução de indicadores anuais a partir dos demonstrativos CVM.
+5. Análise fundamentalista com anos efetivamente disponíveis.
+6. Merge célula a célula entre base consolidada e complemento público.
+7. Cotação do dia coerente com a cotação do cabeçalho.
+8. Dividend Yield saneado para evitar percentuais incompatíveis.
 ```
 
-Ajustes aplicados:
+## Rodar localmente
+
+```powershell
+cd C:\Users\38405395873\Documents\Web\foco-invest
+if (Test-Path .next) { Remove-Item -Recurse -Force .next }
+npm run dev
+```
+
+## Validação
+
+Abra:
 
 ```text
-1. Mantém tentativas automáticas de download da CVM.
-2. Força IPv4 nos requests para dados.cvm.gov.br.
-3. Define CVM_FORCE_IPV4=1 nos workflows do GitHub Actions.
+http://localhost:3000/api/data/status
+http://localhost:3000/api/data/asset/lren3
+http://localhost:3000/acoes/lren3
+http://localhost:3000/acoes/rail3
+http://localhost:3000/acoes/petr3
+http://localhost:3000/acoes/petr4
+http://localhost:3000/acoes/pomo4
+http://localhost:3000/rankings
 ```
 
-## Rodar a atualização completa
+O endpoint `/api/data/status` precisa mostrar conexão com o Supabase. Se não conectar, a página ainda vai usar complemento público, mas os dados CVM históricos/anuais não ficarão completos.
 
-No GitHub:
+## GitHub Actions
+
+Para atualizar a base:
 
 ```text
 Actions > Atualizar ações > Run workflow
@@ -36,6 +62,7 @@ Usar:
 
 ```text
 modo: completo_com_itr
+universo: todas_acoes_b3
 sleep: 1
 anos_dfp: 2024 2023 2022 2021
 anos_itr: 2025 2024
@@ -46,6 +73,6 @@ anos_itr: 2025 2024
 Não subir `.env`, `.env.local`, `.next`, `.venv`, `node_modules` ou chaves reais.
 
 
-## Versão atual
+## v1.53.9
 
-v1.53.4 — fallback de cotação pelo histórico quando `asset_quotes` não retorna cotação direta.
+Saneamento dos demonstrativos históricos, correção do modo CVM --all e opção de atualizar universo amplo de ações da B3 antes da etapa de FIIs.

@@ -502,9 +502,15 @@ def parser() -> argparse.ArgumentParser:
 def main() -> int:
     args=parser().parse_args(); load_project_env()
     client=SupabaseRestClient(SupabaseConfig(url=get_required_env("SUPABASE_URL"), key=get_required_env("SUPABASE_SERVICE_ROLE_KEY")))
-    tickers=[t.upper().replace(".SA","") for t in args.tickers] if args.tickers else STOCK_TICKERS
-    if args.limit: tickers=tickers[:args.limit]
+    if args.all:
+        tickers=[]
+    else:
+        tickers=[t.upper().replace(".SA","") for t in args.tickers] if args.tickers else STOCK_TICKERS
+    if args.limit and tickers:
+        tickers=tickers[:args.limit]
     assets=load_assets(client,tickers)
+    if args.limit and not tickers:
+        assets=assets[:args.limit]
     if not assets:
         print("Nenhuma ação encontrada no Supabase. Rode primeiro update_base_inicial.py ou update_prices_yahoo.py."); return 0
     cad=read_cad(); companies={}; misses=[]; matches=[]

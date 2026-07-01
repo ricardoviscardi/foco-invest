@@ -181,17 +181,40 @@ export async function fetchFundamentusSnapshot(ticker: string): Promise<BrapiAss
     const dividendYield = pickNumber(raw, ["div_yield", "dividend_yield"]);
     const dividendPerShare = pickNumber(raw, ["dividendo_cota", "dividendos_cota", "dividendo_por_cota", "dividend_rate"]);
 
+    const pe = pickNumber(raw, ["p_l", "pl"]);
+    const psr = pickNumber(raw, ["psr", "p_sr"]);
     const priceToBook = pickNumber(raw, ["p_vp"]);
+    const priceToEbit = pickNumber(raw, ["p_ebit"]);
+    const priceToAssets = pickNumber(raw, ["p_ativos"]);
+    const priceToWorkingCapital = pickNumber(raw, ["p_cap_giro"]);
+    const priceToCurrentAssets = pickNumber(raw, ["p_ativ_circ_liq"]);
+    const evToEbit = pickNumber(raw, ["ev_ebit"]);
+    const evToEbitda = pickNumber(raw, ["ev_ebitda"]);
+    const grossMargin = pickNumber(raw, ["mrg_bruta", "margem_bruta"]);
+    const ebitMargin = pickNumber(raw, ["mrg_ebit", "margem_ebit"]);
+    const netMargin = pickNumber(raw, ["mrg_liq", "margem_liquida"]);
+    const currentRatio = pickNumber(raw, ["liq_corr", "liquidez_corrente"]);
+    const roic = pickNumber(raw, ["roic"]);
+    const roe = pickNumber(raw, ["roe"]);
     const bookValue = pickNumber(raw, ["vp_cota", "vpa"]);
+    const earningsPerShare = pickNumber(raw, ["lpa"]);
     const marketCap = pickNumber(raw, ["valor_de_mercado"]);
+    const enterpriseValue = pickNumber(raw, ["valor_da_firma"]);
     const sharesOrQuotas = pickNumber(raw, ["nro_cotas", "nro_acoes"]);
     const price = pickNumber(raw, ["cotacao"]);
-    const volumeAvg2m = pickNumber(raw, ["vol_med_2m", "vol_s_med_2m", "vol_med_2_m"]);
+    const volumeAvg2m = pickNumber(raw, ["vol_med_2m", "vol_s_med_2m", "vol_med_2_m", "liquidez_2_meses", "liq_2meses"]);
     const patrimony = pickNumber(raw, ["patrim_liq", "patrim_liquido"]);
     const assets = pickNumber(raw, ["ativo", "ativos"]);
+    const grossDebt = pickNumber(raw, ["div_bruta", "divida_bruta"]);
+    const netDebt = pickNumber(raw, ["div_liq", "divida_liquida"]);
+    const cash = pickNumber(raw, ["disponibilidades", "caixa"]);
+    const debtToEquity = pickNumber(raw, ["div_br_patrim", "div_bruta_patrim"]);
+    const revenue12m = pickNumber(raw, ["receita_liquida_12m", "receita_liquida", "receita"]);
+    const ebit12m = pickNumber(raw, ["ebit_12m", "ebit"]);
+    const netIncome12m = pickNumber(raw, ["lucro_liquido_12m", "lucro_liquido", "lucro"]);
+    const revenueGrowth5y = pickNumber(raw, ["cresc_rec_5a", "crescimento_rec_5a"]);
     const distributedIncome12m = pickNumber(raw, ["rend_distribuido", "rendimento_distribuido"]);
 
-    const revenue12m = pickNumber(raw, ["receita"]);
     const capRate = pickNumber(raw, ["cap_rate"]);
     const vacancy = pickNumber(raw, ["vacancia_media"]);
     const propertiesCount = pickNumber(raw, ["qtd_imoveis"]);
@@ -210,17 +233,64 @@ export async function fetchFundamentusSnapshot(ticker: string): Promise<BrapiAss
       marketCap,
       sharesOutstanding: sharesOrQuotas,
       regularMarketVolume: volumeAvg2m,
+      averageVolume: volumeAvg2m,
       dividendYield,
       dividendRate: dividendPerShare,
       trailingAnnualDividendYield: dividendYield,
       trailingAnnualDividendRate: dividendPerShare,
+      priceEarnings: pe,
+      trailingPE: pe,
+      peRatio: pe,
       priceToBook,
+      pbRatio: priceToBook,
+      priceToSales: psr,
+      priceSales: psr,
+      priceToEbit,
+      pEbit: priceToEbit,
+      priceToAssets,
+      priceToWorkingCapital,
+      priceToCurrentAssets,
+      enterpriseValue,
+      enterpriseToEbitda: evToEbitda,
+      evToEbitda,
+      enterpriseToEbit: evToEbit,
+      evToEbit,
+      grossMargins: grossMargin,
+      grossMargin,
+      operatingMargins: ebitMargin,
+      ebitMargin,
+      profitMargins: netMargin,
+      netMargin,
+      currentRatio,
+      returnOnInvestedCapital: roic,
+      roic,
+      returnOnEquity: roe,
+      roe,
       bookValue,
+      bookValuePerShare: bookValue,
+      earningsPerShare,
+      lpa: earningsPerShare,
+      totalDebt: grossDebt,
+      grossDebt,
+      netDebt,
+      totalCash: cash,
+      cash,
+      debtToEquity,
+      netDebtToEbitda: netDebt !== null && ebit12m ? netDebt / ebit12m : null,
+      revenueGrowth5y,
 
       vpPerShare: bookValue,
       dividendPerShare,
       patrimony,
+      totalEquity: patrimony,
       assets,
+      totalAssets: assets,
+      revenue12m,
+      revenue: revenue12m,
+      totalRevenue: revenue12m,
+      ebit: ebit12m,
+      operatingIncome: ebit12m,
+      netIncome: netIncome12m,
       lastBalance: pickRaw(raw, ["ult_balanco_processado", "ult_informe_trimestral", "ultimo_informe_trimestral"]),
       quoteDate: pickRaw(raw, ["data_ult_cot"]),
       companyName: pickRaw(raw, ["nome", "empresa"]),
@@ -233,7 +303,6 @@ export async function fetchFundamentusSnapshot(ticker: string): Promise<BrapiAss
       reportDate: pickRaw(raw, ["relatorio"]),
 
       distributedIncome12m,
-      revenue12m,
       capRate,
       vacancy,
       propertiesCount,

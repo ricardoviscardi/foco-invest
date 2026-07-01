@@ -1,76 +1,110 @@
-export function formatCurrency(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) {
+type NumericLike = number | string | null | undefined;
+
+export function toFiniteNumber(value: NumericLike): number | null {
+  if (value === null || value === undefined) return null;
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.toLowerCase() === "nan") return null;
+
+  const hasComma = trimmed.includes(",");
+  const hasDot = trimmed.includes(".");
+  const normalized = hasComma
+    ? (hasDot ? trimmed.replace(/\./g, "").replace(",", ".") : trimmed.replace(",", "."))
+    : trimmed;
+
+  const numberValue = Number(normalized);
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+export function formatCurrency(value: NumericLike): string {
+  const numberValue = toFiniteNumber(value);
+
+  if (numberValue === null) {
     return "Não disponível";
   }
 
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL"
-  }).format(value);
+  }).format(numberValue);
 }
 
-export function formatPercent(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) {
+export function formatPercent(value: NumericLike): string {
+  const numberValue = toFiniteNumber(value);
+
+  if (numberValue === null) {
     return "Não disponível";
   }
 
-  const sign = value > 0 ? "+" : "";
+  const sign = numberValue > 0 ? "+" : "";
 
   return `${sign}${new Intl.NumberFormat("pt-BR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(value)}%`;
+  }).format(numberValue)}%`;
 }
 
-export function formatPlainPercent(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) {
+export function formatPlainPercent(value: NumericLike): string {
+  const numberValue = toFiniteNumber(value);
+
+  if (numberValue === null) {
     return "Não disponível";
   }
 
   return `${new Intl.NumberFormat("pt-BR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(value)}%`;
+  }).format(numberValue)}%`;
 }
 
-export function formatNumber(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) {
+export function formatNumber(value: NumericLike): string {
+  const numberValue = toFiniteNumber(value);
+
+  if (numberValue === null) {
     return "Não disponível";
   }
 
   return new Intl.NumberFormat("pt-BR", {
     maximumFractionDigits: 2
-  }).format(value);
+  }).format(numberValue);
 }
 
-export function formatInteger(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) {
+export function formatInteger(value: NumericLike): string {
+  const numberValue = toFiniteNumber(value);
+
+  if (numberValue === null) {
     return "Não disponível";
   }
 
   return new Intl.NumberFormat("pt-BR", {
     maximumFractionDigits: 0
-  }).format(value);
+  }).format(numberValue);
 }
 
-export function formatLargeCurrency(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) {
+export function formatLargeCurrency(value: NumericLike): string {
+  const numberValue = toFiniteNumber(value);
+
+  if (numberValue === null) {
     return "Não disponível";
   }
 
-  if (Math.abs(value) >= 1_000_000_000_000) {
-    return `R$ ${formatNumber(value / 1_000_000_000_000)} tri`;
+  if (Math.abs(numberValue) >= 1_000_000_000_000) {
+    return `R$ ${formatNumber(numberValue / 1_000_000_000_000)} tri`;
   }
 
-  if (Math.abs(value) >= 1_000_000_000) {
-    return `R$ ${formatNumber(value / 1_000_000_000)} bi`;
+  if (Math.abs(numberValue) >= 1_000_000_000) {
+    return `R$ ${formatNumber(numberValue / 1_000_000_000)} bi`;
   }
 
-  if (Math.abs(value) >= 1_000_000) {
-    return `R$ ${formatNumber(value / 1_000_000)} mi`;
+  if (Math.abs(numberValue) >= 1_000_000) {
+    return `R$ ${formatNumber(numberValue / 1_000_000)} mi`;
   }
 
-  return formatCurrency(value);
+  return formatCurrency(numberValue);
 }
 
 export function formatDate(value: string | null | undefined): string {

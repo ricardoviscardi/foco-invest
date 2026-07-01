@@ -3,7 +3,11 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    def load_dotenv(*_args, **_kwargs):
+        return False
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]

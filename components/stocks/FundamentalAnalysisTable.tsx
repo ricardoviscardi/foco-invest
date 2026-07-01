@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { AnalysisTable, FundamentalAnalysisData } from "@/types/stock";
+import type { AnalysisTable, FundamentalAnalysisData, StockIndicator } from "@/types/stock";
 import { Card } from "@/components/ui/Card";
 
 type FundamentalAnalysisTableProps = {
   data: FundamentalAnalysisData;
+  indicators?: StockIndicator[];
 };
 
 type TabKey = "indicators" | "balanceSheet" | "incomeStatement" | "cashFlow";
@@ -15,17 +16,24 @@ const tabs: Array<{ key: TabKey; label: string }> = [
   { key: "indicators", label: "Indicadores" },
   { key: "balanceSheet", label: "Balanço Patrimonial" },
   { key: "incomeStatement", label: "DRE" },
-  { key: "cashFlow", label: "Fluxo de Caixa" }
+  { key: "cashFlow", label: "Fluxo de Caixa" },
 ];
 
 const periods: Array<{ key: PeriodKey; label: string }> = [
   { key: "annual", label: "Anual" },
-  { key: "quarterly", label: "Trimestral" }
+  { key: "quarterly", label: "Trimestral" },
 ];
 
 function hasUsefulValue(value: string) {
-  const normalized = value.trim();
-  return normalized !== "" && normalized !== "—" && normalized !== "Não disponível";
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized !== "" &&
+    normalized !== "—" &&
+    normalized !== "-" &&
+    normalized !== "não disponível" &&
+    normalized !== "nao disponivel" &&
+    normalized !== "em consolidação"
+  );
 }
 
 function tableHasData(table: AnalysisTable) {
@@ -45,7 +53,7 @@ export function FundamentalAnalysisTable({ data }: FundamentalAnalysisTableProps
 
   const effectiveTab = visibleTabs.some((tab) => tab.key === activeTab)
     ? activeTab
-    : visibleTabs[0]?.key ?? "indicators";
+    : (visibleTabs[0]?.key ?? "indicators");
 
   const visiblePeriods = useMemo(() => {
     const group = data[effectiveTab];
@@ -54,7 +62,7 @@ export function FundamentalAnalysisTable({ data }: FundamentalAnalysisTableProps
 
   const effectivePeriod = visiblePeriods.some((period) => period.key === activePeriod)
     ? activePeriod
-    : visiblePeriods[0]?.key ?? "annual";
+    : (visiblePeriods[0]?.key ?? "annual");
 
   const table = data[effectiveTab][effectivePeriod];
   const hasRows = tableHasData(table);
@@ -110,7 +118,8 @@ export function FundamentalAnalysisTable({ data }: FundamentalAnalysisTableProps
         <AnalysisRows table={table} activeTab={effectiveTab} />
       ) : (
         <div className="mt-6 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-background-alt)] p-6 text-sm text-[var(--color-muted)]">
-          A base fundamentalista deste ativo está em consolidação. Quando os demonstrativos oficiais forem processados, os dados serão exibidos nesta seção.
+          A base fundamentalista deste ativo ainda não possui demonstrativos históricos consolidados.
+          Rode a atualização CVM completa e confira a conexão em /api/data/status.
         </div>
       )}
     </Card>
@@ -136,7 +145,9 @@ function AnalysisRows({ table, activeTab }: { table: AnalysisTable; activeTab: T
         <tbody>
           {table.rows.map((row) => (
             <tr key={row.label} className="border-b border-[var(--color-border)] last:border-b-0">
-              <td className="max-w-[220px] break-words py-3 pr-4 font-medium text-[var(--color-muted)]">{row.label}</td>
+              <td className="max-w-[220px] break-words py-3 pr-4 font-medium text-[var(--color-muted)]">
+                {row.label}
+              </td>
               {row.values.map((value, index) => (
                 <td key={`${row.label}-${index}`} className={index === 0 ? "px-4 py-3 font-semibold" : "px-4 py-3"}>
                   {value}

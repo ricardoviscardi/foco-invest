@@ -1,6 +1,6 @@
 import Image from "next/image";
 import type { StockData } from "@/types/stock";
-import { formatCurrency, formatPercent } from "@/lib/utils/formatters";
+import { formatCurrency, formatPercent, toFiniteNumber } from "@/lib/utils/formatters";
 import { sameDisplayText, sanitizeDisplayText } from "@/lib/utils/text";
 
 type StockHeaderProps = {
@@ -8,8 +8,12 @@ type StockHeaderProps = {
 };
 
 export function StockHeader({ stock }: StockHeaderProps) {
-  const hasVariation = stock.quote.changeValue !== null && stock.quote.changeValue !== undefined && stock.quote.changePercent !== null && stock.quote.changePercent !== undefined;
-  const isPositive = (stock.quote.changePercent ?? 0) >= 0;
+  const latestHistoryPrice = stock.history.at(-1)?.close ?? null;
+  const displayPrice = toFiniteNumber(stock.quote.price) ?? toFiniteNumber(latestHistoryPrice);
+  const displayChangeValue = toFiniteNumber(stock.quote.changeValue);
+  const displayChangePercent = toFiniteNumber(stock.quote.changePercent);
+  const hasVariation = displayChangeValue !== null && displayChangePercent !== null;
+  const isPositive = (displayChangePercent ?? 0) >= 0;
   const companyName = sanitizeDisplayText(stock.companyName) || stock.ticker;
   const sector = sanitizeDisplayText(stock.sector) || "Não disponível";
   const subsector = sameDisplayText(stock.subsector, sector) ? "" : sanitizeDisplayText(stock.subsector);
@@ -49,7 +53,7 @@ export function StockHeader({ stock }: StockHeaderProps) {
         <div className="text-left md:text-right">
           <p className="text-sm text-[var(--color-muted)]">Cotação atual</p>
           <p className="mt-1 text-4xl font-bold text-[var(--color-text)]">
-            {formatCurrency(stock.quote.price)}
+            {formatCurrency(displayPrice)}
           </p>
           {hasVariation ? (
             <p
@@ -59,7 +63,7 @@ export function StockHeader({ stock }: StockHeaderProps) {
                   : "mt-2 text-base font-semibold text-[var(--color-negative)]"
               }
             >
-              {formatCurrency(stock.quote.changeValue)} ({formatPercent(stock.quote.changePercent)})
+              {formatCurrency(displayChangeValue)} ({formatPercent(displayChangePercent)})
             </p>
           ) : (
             <p className="mt-2 text-base font-semibold text-[var(--color-muted)]">

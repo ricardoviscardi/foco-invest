@@ -45,9 +45,13 @@ export function RankingSelector({ stocks, fiis }: RankingSelectorProps) {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-primary)]">
               Tipo de ativo
             </p>
-            <h2 className="mt-2 text-2xl font-bold">Escolha o universo do ranking</h2>
+            <h2 className="mt-2 text-2xl font-bold">
+              Escolha o universo do ranking
+            </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--color-muted)]">
-              Os rankings usam uma lista monitorada do Foco Invest, dados retornados pela brapi, Yahoo Finance complementar, cálculo com proventos e cache local. Ainda não é um ranking de todos os ativos da B3.
+              Os rankings usam uma lista monitorada do Foco Invest, com dados
+              consolidados e filtros internos de qualidade. Ainda não é um
+              ranking de todos os ativos da B3.
             </p>
           </div>
 
@@ -55,18 +59,22 @@ export function RankingSelector({ stocks, fiis }: RankingSelectorProps) {
             <button
               type="button"
               onClick={() => setMode("stocks")}
-              className={mode === "stocks"
-                ? "rounded-xl bg-[var(--color-primary)] px-5 py-2 text-sm font-bold text-white"
-                : "rounded-xl px-5 py-2 text-sm font-semibold text-[var(--color-muted)] transition hover:text-[var(--color-primary)]"}
+              className={
+                mode === "stocks"
+                  ? "rounded-xl bg-[var(--color-primary)] px-5 py-2 text-sm font-bold text-white"
+                  : "rounded-xl px-5 py-2 text-sm font-semibold text-[var(--color-muted)] transition hover:text-[var(--color-primary)]"
+              }
             >
               Ações
             </button>
             <button
               type="button"
               onClick={() => setMode("fiis")}
-              className={mode === "fiis"
-                ? "rounded-xl bg-[var(--color-primary)] px-5 py-2 text-sm font-bold text-white"
-                : "rounded-xl px-5 py-2 text-sm font-semibold text-[var(--color-muted)] transition hover:text-[var(--color-primary)]"}
+              className={
+                mode === "fiis"
+                  ? "rounded-xl bg-[var(--color-primary)] px-5 py-2 text-sm font-bold text-white"
+                  : "rounded-xl px-5 py-2 text-sm font-semibold text-[var(--color-muted)] transition hover:text-[var(--color-primary)]"
+              }
             >
               FIIs
             </button>
@@ -76,25 +84,41 @@ export function RankingSelector({ stocks, fiis }: RankingSelectorProps) {
 
       <div className="rounded-3xl border border-[var(--color-border)] bg-[var(--color-background-alt)] p-5">
         <h2 className="text-xl font-bold">{active.label}</h2>
-        <p className="mt-2 text-sm leading-6 text-[var(--color-muted)]">{active.description}</p>
+        <p className="mt-2 text-sm leading-6 text-[var(--color-muted)]">
+          {active.description}
+        </p>
       </div>
 
       {active.tables.map((table) => (
-        <RankingTable key={`${mode}-${table.title}`} table={table} linkBase={linkBase} />
+        <RankingTable
+          key={`${mode}-${table.title}`}
+          table={table}
+          linkBase={linkBase}
+        />
       ))}
     </div>
   );
 }
 
-function RankingTable({ table, linkBase }: { table: RankingTableData; linkBase: string }) {
+function RankingTable({
+  table,
+  linkBase,
+}: {
+  table: RankingTableData;
+  linkBase: string;
+}) {
   return (
     <Card>
       <div className="flex flex-col justify-between gap-2 md:flex-row md:items-end">
         <div>
           <h2 className="text-xl font-bold">{table.title}</h2>
-          <p className="mt-2 text-sm text-[var(--color-muted)]">{table.description}</p>
+          <p className="mt-2 text-sm text-[var(--color-muted)]">
+            {table.description}
+          </p>
         </div>
-        <p className="text-xs font-semibold text-[var(--color-muted)]">Mín. 5 • Máx. 10 ativos</p>
+        <p className="text-xs font-semibold text-[var(--color-muted)]">
+          Mín. 5 • Máx. 10 ativos
+        </p>
       </div>
 
       {table.items.length ? (
@@ -111,16 +135,32 @@ function RankingTable({ table, linkBase }: { table: RankingTableData; linkBase: 
             </thead>
             <tbody>
               {table.items.map((item, index) => (
-                <tr key={`${table.title}-${item.ticker}-${index}`} className="border-b border-[var(--color-border)] last:border-b-0">
-                  <td className="py-3 pr-4 font-bold text-[var(--color-primary)]">{index + 1}</td>
+                <tr
+                  key={`${table.title}-${item.ticker}-${index}`}
+                  className="border-b border-[var(--color-border)] last:border-b-0"
+                >
+                  <td className="py-3 pr-4 font-bold text-[var(--color-primary)]">
+                    {index + 1}
+                  </td>
                   <td className="px-4 py-3 font-bold">
-                    <Link href={`${linkBase}/${item.ticker.toLowerCase()}`} className="text-[var(--color-primary)] hover:underline">
+                    <Link
+                      href={`${linkBase}/${item.ticker.toLowerCase()}`}
+                      className="text-[var(--color-primary)] hover:underline"
+                    >
                       {item.ticker}
                     </Link>
                   </td>
                   <td className="px-4 py-3 font-medium">{item.name}</td>
-                  <td className="px-4 py-3 text-[var(--color-muted)]">{item.sector}</td>
-                  <td className={item.hasData ? "px-4 py-3 text-right font-bold" : "px-4 py-3 text-right font-semibold text-[var(--color-muted)]"}>
+                  <td className="px-4 py-3 text-[var(--color-muted)]">
+                    {item.sector}
+                  </td>
+                  <td
+                    className={
+                      item.hasData
+                        ? "px-4 py-3 text-right font-bold"
+                        : "px-4 py-3 text-right font-semibold text-[var(--color-muted)]"
+                    }
+                  >
                     {item.displayValue}
                   </td>
                 </tr>

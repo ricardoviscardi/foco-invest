@@ -25,6 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-prices", action="store_true", help="Pula atualização de preço/histórico/proventos.")
     parser.add_argument("--skip-cvm", action="store_true", help="Pula atualização CVM.")
     parser.add_argument("--prices-optional", action="store_true", help="Continua para CVM mesmo se preços falharem.")
+    parser.add_argument("--b3-stocks", action="store_true", help="Usa universo amplo/dinâmico de ações da B3 na etapa de preços.")
     return parser
 
 
@@ -32,9 +33,9 @@ def main() -> int:
     args = build_parser().parse_args()
 
     if not args.skip_prices:
-        run([
-            sys.executable, "scripts/update_base_inicial.py", "--stocks", "--sleep", str(args.sleep)
-        ], optional=args.prices_optional)
+        price_command = [sys.executable, "scripts/update_base_inicial.py", "--sleep", str(args.sleep)]
+        price_command.append("--b3-stocks" if args.b3_stocks else "--stocks")
+        run(price_command, optional=args.prices_optional)
 
     if not args.skip_cvm:
         cvm_command = [sys.executable, "scripts/update_cvm_companies.py", "--all", "--years", *args.years]

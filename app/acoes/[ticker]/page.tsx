@@ -21,7 +21,9 @@ type StockPageProps = {
   }>;
 };
 
-export async function generateMetadata({ params }: StockPageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: StockPageProps): Promise<Metadata> {
   const { ticker } = await params;
   const stock = await getStockByTicker(ticker);
   const baseUrl = getBaseUrl();
@@ -39,10 +41,10 @@ export async function generateMetadata({ params }: StockPageProps): Promise<Meta
       `${stock.ticker} fundamentos`,
       `${stock.ticker} P/L`,
       `${stock.ticker} dividend yield`,
-      `${stock.ticker} gráfico`
+      `${stock.ticker} gráfico`,
     ],
     alternates: {
-      canonical: canonicalPath
+      canonical: canonicalPath,
     },
     openGraph: {
       title,
@@ -50,13 +52,13 @@ export async function generateMetadata({ params }: StockPageProps): Promise<Meta
       url: `${baseUrl}${canonicalPath}`,
       siteName: "Foco Invest",
       locale: "pt_BR",
-      type: "article"
+      type: "article",
     },
     twitter: {
       card: "summary_large_image",
       title,
-      description
-    }
+      description,
+    },
   };
 }
 
@@ -74,13 +76,13 @@ export default async function StockPage({ params }: StockPageProps) {
     isPartOf: {
       "@type": "WebSite",
       name: "Foco Invest",
-      url: baseUrl
+      url: baseUrl,
     },
     about: {
       "@type": "Corporation",
       name: stock.fullName ?? stock.companyName,
-      tickerSymbol: stock.ticker
-    }
+      tickerSymbol: stock.ticker,
+    },
   };
 
   return (
@@ -109,7 +111,10 @@ export default async function StockPage({ params }: StockPageProps) {
       </div>
 
       <div className="mt-6 min-w-0 space-y-6">
-        <FundamentalAnalysisTable data={stock.fundamentalAnalysis} />
+        <FundamentalAnalysisTable
+          data={stock.fundamentalAnalysis}
+          indicators={stock.indicators}
+        />
         <DividendsTable dividends={stock.dividends} />
       </div>
     </section>

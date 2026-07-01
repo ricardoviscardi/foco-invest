@@ -25,6 +25,14 @@ on:
         description: "Anos ITR separados por espaço"
         required: false
         default: "2025 2024"
+      universo:
+        description: "Universo de ações"
+        required: false
+        default: "base_ampliada"
+        type: choice
+        options:
+          - base_ampliada
+          - todas_acoes_b3
 
   schedule:
     - cron: "30 23 * * 1-5"
@@ -77,8 +85,13 @@ jobs:
 
       - name: Atualizar apenas preços
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.modo == 'precos' }}
+        shell: bash
         run: |
-          python scripts/update_base_inicial.py --stocks --sleep ${{ inputs.sleep }}
+          if [ "${{ inputs.universo }}" = "todas_acoes_b3" ]; then
+            python scripts/update_base_inicial.py --b3-stocks --sleep ${{ inputs.sleep }}
+          else
+            python scripts/update_base_inicial.py --stocks --sleep ${{ inputs.sleep }}
+          fi
 
       - name: Atualizar apenas CVM
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.modo == 'cvm' }}
@@ -87,18 +100,39 @@ jobs:
 
       - name: Atualizar completo sem ITR
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.modo == 'completo_sem_itr' }}
+        shell: bash
         run: |
-          python scripts/update_all_stocks_full.py --sleep ${{ inputs.sleep }} --years ${{ inputs.anos_dfp }}
+          EXTRA=""
+          if [ "${{ inputs.universo }}" = "todas_acoes_b3" ]; then EXTRA="--b3-stocks"; fi
+          python scripts/update_all_stocks_full.py --sleep ${{ inputs.sleep }} $EXTRA --years ${{ inputs.anos_dfp }}
 
       - name: Atualizar completo com ITR
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.modo == 'completo_com_itr' }}
+        shell: bash
         run: |
-          python scripts/update_all_stocks_full.py --sleep ${{ inputs.sleep }} --with-itr --years ${{ inputs.anos_dfp }} --itr-years ${{ inputs.anos_itr }}
+          EXTRA=""
+          if [ "${{ inputs.universo }}" = "todas_acoes_b3" ]; then EXTRA="--b3-stocks"; fi
+          python scripts/update_all_stocks_full.py --sleep ${{ inputs.sleep }} $EXTRA --with-itr --years ${{ inputs.anos_dfp }} --itr-years ${{ inputs.anos_itr }}
 
       - name: Conferir base
         if: always()
         run: |
           python scripts/check_supabase_data.py
+
+      - name: Exportar snapshot local de ações
+        if: always()
+        run: |
+          python scripts/export_stock_snapshots.py --all-stocks --output public/data/snapshots/stocks --limit-history 2600
+
+      - name: Salvar snapshot local de ações
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-local-acoes
+          path: |
+            public/data/snapshots/index.json
+            public/data/snapshots/stocks/*.json
+          if-no-files-found: ignore
 
       - name: Salvar relatórios
         if: always()

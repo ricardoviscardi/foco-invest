@@ -26,6 +26,7 @@ from typing import Any
 from config import ROOT_DIR, get_required_env, load_project_env
 from supabase_rest import SupabaseConfig, SupabaseRestClient
 from tickers import ALL_TICKERS, CORE_TICKERS, FII_TICKERS, STOCK_TICKERS
+from b3_universe import load_b3_stock_tickers
 from update_prices_yahoo import update_one
 
 
@@ -39,6 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--core", action="store_true", help="Atualiza apenas a lista principal validada.")
     group.add_argument("--all", action="store_true", help="Atualiza ações e FIIs da base ampliada.")
     group.add_argument("--stocks", action="store_true", help="Atualiza apenas ações da base ampliada.")
+    group.add_argument("--b3-stocks", action="store_true", help="Atualiza universo amplo/dinâmico de ações da B3.")
     group.add_argument("--fiis", action="store_true", help="Atualiza apenas FIIs da base ampliada.")
     parser.add_argument("--limit", type=int, default=None, help="Limita a quantidade de ativos processados.")
     parser.add_argument("--start-from", type=str, default=None, help="Começa a partir de um ticker específico.")
@@ -47,7 +49,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def select_tickers(args: argparse.Namespace) -> list[str]:
-    if args.stocks:
+    if args.b3_stocks:
+        tickers = load_b3_stock_tickers()
+    elif args.stocks:
         tickers = STOCK_TICKERS
     elif args.fiis:
         tickers = FII_TICKERS
