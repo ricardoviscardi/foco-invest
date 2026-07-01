@@ -27,7 +27,7 @@ import {
   toFiniteNumber,
 } from "@/lib/utils/formatters";
 
-const STOCK_CACHE_VERSION = "v15319";
+const STOCK_CACHE_VERSION = "v15320";
 const STOCK_CACHE_TTL_MS = 15 * 60 * 1000;
 const STOCK_STALE_TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -97,6 +97,7 @@ function parseBrazilianNumber(value: string | null | undefined): number | null {
     .replace(/R\$/gi, "")
     .replace(/%/g, "")
     .replace(/\s/g, "")
+    .replace(/[^0-9,.-]/g, "")
     .replace(/\./g, "")
     .replace(/,/g, ".");
   const parsed = Number(clean);
@@ -362,6 +363,148 @@ function makeQuoteRow(label: string, value: string | null, note: string): StockF
   };
 }
 
+
+function findAnalysisValue(
+  data: FundamentalAnalysisData,
+  labels: string[],
+): string | null {
+  const tables: AnalysisTable[] = [
+    data.indicators.annual,
+    data.indicators.quarterly,
+    data.balanceSheet.annual,
+    data.balanceSheet.quarterly,
+    data.incomeStatement.annual,
+    data.incomeStatement.quarterly,
+    data.cashFlow.annual,
+    data.cashFlow.quarterly,
+  ];
+  const normalizedLabels = labels.map(normalizeLabel);
+
+  for (const table of tables) {
+    for (const row of table.rows) {
+      if (!normalizedLabels.includes(normalizeLabel(row.label))) continue;
+      const value = row.values.find(hasUsefulText);
+      if (hasUsefulText(value)) return value ?? null;
+    }
+  }
+
+  return null;
+}
+
+function enrichIndicatorsFromAnalysis(stock: StockData): StockIndicator[] {
+  const aliases: Record<string, string[]> = {
+    pl: ["P/L"],
+    pvp: ["P/VP"],
+    dividendyield: ["Dividend Yield", "Div. Yield", "DY 12m"],
+    roe: ["ROE"],
+    roa: ["ROA"],
+    roic: ["ROIC"],
+    margemliquida: ["Margem líquida", "Mg. Líquida"],
+    evebitda: ["EV/EBITDA"],
+    divliqebitda: ["Dív.Líq/EBITDA", "Dív. líquida/EBITDA"],
+    vpa: ["VPA", "VP/Cota", "Valor patrimonial por cota"],
+    marketcap: ["Valor de mercado"],
+    dividendoporcota: ["Dividendo/Cota", "Dividendo/ação"],
+    dividendoporcao: ["Dividendo/Cota", "Dividendo/ação"],
+    ndecotas: ["Nº de cotas", "Nº de ações"],
+    ndeacoes: ["Nº de cotas", "Nº de ações"],
+  };
+
+  return stock.indicators.map((indicator) => {
+    if (hasUsefulText(indicator.value)) return indicator;
+    const key = normalizeLabel(indicator.label);
+    const candidates = aliases[key] ?? [indicator.label];
+    const value = findAnalysisValue(stock.fundamentalAnalysis, candidates);
+    return hasUsefulText(value)
+      ? { ...indicator, value: value as string, status: "calculado" }
+      : indicator;
+  });
+}
+
+function hasUsefulRow(row: { values: string[] }): boolean {
+  return row.values.some(hasUsefulText);
+}
+
+function trimAnalysisTable(table: AnalysisTable): AnalysisTable {
+  const rows = table.rows.filter(hasUsefulRow);
+  const usefulColumnIndexes = table.columns
+    .map((column, index) => ({ column, index }))
+    .filter(({ column, index }) => {
+      if (isPlaceholderColumn(column)) {
+        return rows.some((row) => hasUsefulText(row.values[index]));
+      }
+      return rows.some((row) => hasUsefulText(row.values[index]));
+    })
+    .map(({ index }) => index);
+
+  // Se a filtragem remover tudo, preserva a tabela original para que a mensagem
+  // de vazio continue funcionando. Caso contrário, remove colunas e linhas 100% vazias,
+  // evitando que a tela pareça quebrada por campos que a fonte não retornou.
+  if (!rows.length || !usefulColumnIndexes.length) return table;
+
+  return {
+    ...table,
+    columns: usefulColumnIndexes.map((index) => table.columns[index]),
+    rows: rows.map((row) => ({
+      ...row,
+      values: usefulColumnIndexes.map((index) => row.values[index] ?? "—"),
+    })),
+  };
+}
+
+function trimFundamentalAnalysis(data: FundamentalAnalysisData): FundamentalAnalysisData {
+  return {
+    indicators: {
+      annual: trimAnalysisTable(data.indicators.annual),
+      quarterly: trimAnalysisTable(data.indicators.quarterly),
+    },
+    balanceSheet: {
+      annual: trimAnalysisTable(data.balanceSheet.annual),
+      quarterly: trimAnalysisTable(data.balanceSheet.quarterly),
+    },
+    incomeStatement: {
+      annual: trimAnalysisTable(data.incomeStatement.annual),
+      quarterly: trimAnalysisTable(data.incomeStatement.quarterly),
+    },
+    cashFlow: {
+      annual: trimAnalysisTable(data.cashFlow.annual),
+      quarterly: trimAnalysisTable(data.cashFlow.quarterly),
+    },
+  };
+}
+
+function dividendCashFromEvents(dividends: DividendEvent[], referenceDate = new Date()): number | null {
+  const start = new Date(referenceDate);
+  start.setFullYear(start.getFullYear() - 1);
+  let total = 0;
+
+  for (const event of dividends) {
+    const rawDate = event.paymentDate && event.paymentDate !== "Não disponível" ? event.paymentDate : event.comDate;
+    const date = rawDate ? new Date(rawDate.split("/").reverse().join("-")) : null;
+    const value = parseBrazilianNumber(event.value);
+    if (!date || Number.isNaN(date.getTime()) || value === null || value <= 0) continue;
+    if (date >= start && date <= referenceDate) total += value;
+  }
+
+  return total > 0 ? total : null;
+}
+
+function cleanWarnings(stock: StockData): string[] {
+  const hasHistoricalTables = [
+    stock.fundamentalAnalysis.indicators.annual,
+    stock.fundamentalAnalysis.balanceSheet.annual,
+    stock.fundamentalAnalysis.incomeStatement.annual,
+    stock.fundamentalAnalysis.cashFlow.annual,
+  ].some((table) => table.columns.some((column) => !isPlaceholderColumn(column)) && tableScore(table) > 0);
+
+  return stock.warnings.filter((warning) => {
+    const normalized = warning.toLowerCase();
+    if (hasHistoricalTables && normalized.includes("base histórica")) return false;
+    if (normalized.includes("fonte")) return false;
+    return true;
+  });
+}
+
 function normalizeStockForDisplay(stock: StockData): StockData {
   const latestHistory = stock.history.at(-1) ?? null;
   const previousHistory = stock.history.at(-2) ?? null;
@@ -406,12 +549,19 @@ function normalizeStockForDisplay(stock: StockData): StockData {
       ];
 
   const isFii = isLikelyFii(stock);
-  const sanitizedYield = isPlausibleDividendValue(stock.dividendSummary.yield12m, isFii)
+  const dividendCash = dividendCashFromEvents(stock.dividends);
+  const computedYield = price && dividendCash ? formatPlainPercent((dividendCash / price) * 100) : null;
+  const chosenYield = hasUsefulText(stock.dividendSummary.yield12m)
     ? stock.dividendSummary.yield12m
+    : computedYield;
+  const sanitizedYield: string = isPlausibleDividendValue(chosenYield, isFii)
+    ? (chosenYield as string)
     : "Não disponível";
-
-  return {
+  const fundamentalAnalysis = trimFundamentalAnalysis(stock.fundamentalAnalysis);
+  const normalizedBase: StockData = {
     ...stock,
+    fundamentalAnalysis,
+    warnings: cleanWarnings({ ...stock, fundamentalAnalysis }),
     quote: {
       ...stock.quote,
       price,
@@ -428,8 +578,19 @@ function normalizeStockForDisplay(stock: StockData): StockData {
     dividendSummary: {
       ...stock.dividendSummary,
       yield12m: sanitizedYield,
-      cash12m: sanitizedYield === "Não disponível" ? "Não disponível" : stock.dividendSummary.cash12m,
+      cash12m: sanitizedYield === "Não disponível"
+        ? "Não disponível"
+        : hasUsefulText(stock.dividendSummary.cash12m)
+          ? stock.dividendSummary.cash12m
+          : dividendCash === null
+            ? stock.dividendSummary.cash12m
+            : `${formatCurrency(dividendCash)}/${isFii ? "cota" : "ação"}`,
     },
+  };
+
+  return {
+    ...normalizedBase,
+    indicators: enrichIndicatorsFromAnalysis(normalizedBase),
   };
 }
 
@@ -455,10 +616,14 @@ function hasMissingImportantData(stock: StockData): boolean {
   const isFii = isLikelyFii(stock);
 
   if (isFii) {
+    const visibleScore =
+      tableScore(stock.fundamentalAnalysis.indicators.annual) +
+      tableScore(stock.fundamentalAnalysis.balanceSheet.annual) +
+      tableScore(stock.fundamentalAnalysis.incomeStatement.annual);
     return (
-      indicatorMissingRatio >= 0.15 ||
-      financialScore <= 12 ||
-      dayRowsMissing >= 2 ||
+      indicatorMissingRatio >= 0.10 ||
+      visibleScore <= 8 ||
+      dayRowsMissing >= 1 ||
       dividendInvalid
     );
   }
@@ -527,6 +692,13 @@ function withCacheWarning(
   };
 }
 
+function shouldTryLiveComplement(stock: StockData): boolean {
+  if (hasMissingImportantData(stock)) return true;
+  if (stock.ticker === "NTCO3") return true;
+  if (stock.assetKind === "fii") return true;
+  return false;
+}
+
 async function fetchLiveComplement(normalizedTicker: string): Promise<StockData | null> {
   const bundle = await fetchBrapiBundle(normalizedTicker);
   const hasAnyData = Boolean(
@@ -591,7 +763,7 @@ export async function getStockByTicker(ticker: string): Promise<StockData> {
   const primaryStock = supabaseStock ?? localSnapshotStock ?? remoteSnapshotStock;
 
   if (primaryStock) {
-    if (!hasMissingImportantData(primaryStock)) {
+    if (!shouldTryLiveComplement(primaryStock)) {
       return normalizeStockForDisplay(setCachedValue(
         cacheKey,
         primaryStock,

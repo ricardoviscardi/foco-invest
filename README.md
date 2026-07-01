@@ -1,4 +1,6 @@
-# Foco Invest — v1.53.10
+# Foco Invest
+
+Versão: v1.53.20 — Redução de dados indisponíveis em ações e FIIs. — v1.53.10
 
 Versão com snapshot local de ações para testar a base completa em redes que bloqueiam o Supabase.
 

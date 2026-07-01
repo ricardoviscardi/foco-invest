@@ -158,6 +158,7 @@ export function FundamentalAnalysisTable({ data, assetKind = "stock" }: Fundamen
 
 function AnalysisRows({ table, activeTab }: { table: AnalysisTable; activeTab: TabKey }) {
   const firstColumn = activeTab === "indicators" ? "Indicador" : "Conta";
+  const rows = table.rows.filter((row) => row.values.some(hasUsefulValue));
 
   return (
     <div className="mt-6 max-w-full overflow-x-auto rounded-2xl">
@@ -173,7 +174,7 @@ function AnalysisRows({ table, activeTab }: { table: AnalysisTable; activeTab: T
           </tr>
         </thead>
         <tbody>
-          {table.rows.map((row) => (
+          {rows.map((row) => (
             <tr key={row.label} className="border-b border-[var(--color-border)] last:border-b-0">
               <td className="max-w-[220px] break-words py-3 pr-4 font-medium text-[var(--color-muted)]">
                 {row.label}

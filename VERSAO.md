@@ -1,3 +1,7 @@
+# Versão atual
+
+v1.53.20 — Redução de dados indisponíveis em ações e FIIs.
+
 # Foco Invest - v1.53.18
 
 Correção de match CVM para NTCO3/WIZC3 e publicação segura do snapshot.
