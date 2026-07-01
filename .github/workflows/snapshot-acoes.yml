@@ -1,0 +1,85 @@
+name: Recriar snapshot de ações
+
+on:
+  workflow_dispatch:
+    inputs:
+      publicar_snapshot:
+        description: "Publicar snapshot no repositório?"
+        required: true
+        default: "sim"
+        type: choice
+        options:
+          - sim
+          - nao
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot-acoes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validar secrets
+        shell: bash
+        run: |
+          if [ -z "$SUPABASE_URL" ]; then
+            echo "SUPABASE_URL não configurada nos Secrets."
+            exit 1
+          fi
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "SUPABASE_SERVICE_ROLE_KEY não configurada nos Secrets."
+            exit 1
+          fi
+
+      - name: Exportar snapshot completo
+        run: |
+          rm -rf public/data/snapshots
+          python scripts/export_stock_snapshots.py --all-stocks --output public/data/snapshots/stocks --limit-history 2600
+
+      - name: Validar snapshot
+        run: |
+          python scripts/verify_snapshot_coverage.py --min-annual-years 3 --min-history 200
+
+      - name: Salvar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-local-acoes
+          path: |
+            public/data/snapshots/index.json
+            public/data/snapshots/stocks/*.json
+          if-no-files-found: error
+
+      - name: Publicar snapshot no repositório
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publicar_snapshot == 'sim' }}
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/snapshots
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteração de snapshot para publicar."
+          else
+            git commit -m "atualiza snapshot completo de ações"
+            git pull --rebase origin main
+            git push
+          fi

@@ -78,6 +78,11 @@ Não subir `.env`, `.env.local`, `.next`, `.venv`, `node_modules` ou chaves reai
 Saneamento dos demonstrativos históricos, correção do modo CVM --all e opção de atualizar universo amplo de ações da B3 antes da etapa de FIIs.
 
 
-## v1.53.11
+## v1.53.12
 
 Correção do fluxo de dados em rede local bloqueada: Supabase > snapshot local > snapshot remoto > complemento parcial. O workflow pode publicar snapshots no repositório para exibir análise fundamentalista, balanço, DRE, fluxo de caixa e dividendos mesmo quando o Supabase estiver bloqueado localmente.
+
+
+## v1.53.12 — Snapshot obrigatório para dados históricos locais
+
+Correção do fluxo de dados para redes que bloqueiam o Supabase: adiciona workflow independente para recriar/publicar snapshot, valida cobertura mínima de demonstrativos e melhora o diagnóstico quando a página estiver usando apenas dados públicos parciais.

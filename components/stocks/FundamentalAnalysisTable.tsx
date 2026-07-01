@@ -40,6 +40,17 @@ function tableHasData(table: AnalysisTable) {
   return table.rows.some((row) => row.values.some(hasUsefulValue));
 }
 
+function hasHistoricalColumns(table: AnalysisTable) {
+  return table.columns.some((column) => {
+    const normalized = column.trim().toLowerCase();
+    return normalized !== "" && normalized !== "—" && normalized !== "-" && normalized !== "atual";
+  });
+}
+
+function isOnlyCurrentTable(table: AnalysisTable) {
+  return tableHasData(table) && !hasHistoricalColumns(table);
+}
+
 export function FundamentalAnalysisTable({ data }: FundamentalAnalysisTableProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("indicators");
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("annual");
@@ -66,6 +77,7 @@ export function FundamentalAnalysisTable({ data }: FundamentalAnalysisTableProps
 
   const table = data[effectiveTab][effectivePeriod];
   const hasRows = tableHasData(table);
+  const onlyCurrent = isOnlyCurrentTable(table);
 
   return (
     <Card>
@@ -115,7 +127,15 @@ export function FundamentalAnalysisTable({ data }: FundamentalAnalysisTableProps
       </div>
 
       {hasRows ? (
-        <AnalysisRows table={table} activeTab={effectiveTab} />
+        <>
+          {onlyCurrent ? (
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+              A tabela abaixo está com dados atuais/parciais porque a base histórica completa não foi carregada nesta execução.
+              Para exibir os últimos anos em Indicadores, Balanço, DRE e Fluxo de Caixa, gere e publique o snapshot pelo GitHub Actions e depois rode <strong>git pull</strong>.
+            </div>
+          ) : null}
+          <AnalysisRows table={table} activeTab={effectiveTab} />
+        </>
       ) : (
         <div className="mt-6 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-background-alt)] p-6 text-sm text-[var(--color-muted)]">
           A base fundamentalista deste ativo ainda não possui demonstrativos históricos consolidados.

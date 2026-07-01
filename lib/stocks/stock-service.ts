@@ -27,7 +27,7 @@ import {
   toFiniteNumber,
 } from "@/lib/utils/formatters";
 
-const STOCK_CACHE_VERSION = "v15311";
+const STOCK_CACHE_VERSION = "v15312";
 const STOCK_CACHE_TTL_MS = 15 * 60 * 1000;
 const STOCK_STALE_TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -614,9 +614,18 @@ export async function getStockByTicker(ticker: string): Promise<StockData> {
     );
   }
 
+  const partialLiveStock: StockData = {
+    ...liveStock,
+    source: "Complemento público parcial",
+    warnings: Array.from(new Set([
+      ...(liveStock.warnings ?? []),
+      "Base histórica local não encontrada. Para exibir indicadores, balanço, DRE, fluxo de caixa e proventos com 5 anos, publique/baixe o snapshot gerado pelo GitHub Actions.",
+    ])),
+  };
+
   return normalizeStockForDisplay(setCachedValue(
     cacheKey,
-    liveStock,
+    partialLiveStock,
     STOCK_CACHE_TTL_MS,
     STOCK_STALE_TTL_MS,
   ));

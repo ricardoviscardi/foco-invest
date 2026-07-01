@@ -135,6 +135,11 @@ jobs:
         run: |
           python scripts/export_stock_snapshots.py --all-stocks --output public/data/snapshots/stocks --limit-history 2600
 
+      - name: Validar snapshot de ações
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.publicar_snapshot == 'sim' }}
+        run: |
+          python scripts/verify_snapshot_coverage.py --min-annual-years 3 --min-history 200
+
       - name: Salvar snapshot local de ações
         if: always()
         uses: actions/upload-artifact@v4
