@@ -9,6 +9,7 @@ type StockSuggestion = {
   name: string;
   sector?: string;
   logoUrl?: string;
+  type?: string;
   source?: string;
 };
 
@@ -22,6 +23,41 @@ type StockAutocompleteProps = {
 
 function cleanTicker(value: string): string {
   return value.trim().replace(/\s+/g, "").toLowerCase();
+}
+
+const STOCK_UNIT_TICKERS = new Set([
+  "BPAC11",
+  "ENGI11",
+  "KLBN11",
+  "SANB11",
+  "SAPR11",
+  "TAEE11",
+]);
+
+function isFiiSuggestion(item?: StockSuggestion | null): boolean {
+  if (!item) return false;
+  const symbol = item.symbol.toUpperCase();
+  const type = String(item.type ?? "").toLowerCase();
+  const sector = String(item.sector ?? "").toLowerCase();
+  return (
+    type === "fii" ||
+    type === "fund" ||
+    sector.includes("fii") ||
+    sector.includes("fundo") ||
+    (symbol.endsWith("11") && !STOCK_UNIT_TICKERS.has(symbol))
+  );
+}
+
+function targetPathForSuggestion(item: StockSuggestion): string {
+  const normalizedTicker = cleanTicker(completeCommonB3Ticker(item.symbol));
+  return isFiiSuggestion(item) ? `/fiis/${normalizedTicker}` : `/acoes/${normalizedTicker}`;
+}
+
+function targetPathForRawTicker(ticker: string): string {
+  const normalized = completeCommonB3Ticker(ticker);
+  const lower = cleanTicker(normalized);
+  const shouldOpenAsFii = normalized.endsWith("11") && !STOCK_UNIT_TICKERS.has(normalized);
+  return shouldOpenAsFii ? `/fiis/${lower}` : `/acoes/${lower}`;
 }
 
 function completeCommonB3Ticker(value: string): string {
@@ -85,11 +121,11 @@ export function StockAutocomplete({
     };
   }, [normalizedQuery]);
 
-  function goToTicker(ticker: string) {
+  function goToTicker(ticker: string, suggestion?: StockSuggestion | null) {
     const normalizedTicker = cleanTicker(completeCommonB3Ticker(ticker));
     if (!normalizedTicker) return;
 
-    router.push(`/acoes/${normalizedTicker}`);
+    router.push(suggestion ? targetPathForSuggestion(suggestion) : targetPathForRawTicker(ticker));
     setQuery("");
     setSuggestions([]);
     setIsOpen(false);
@@ -99,7 +135,7 @@ export function StockAutocomplete({
     event.preventDefault();
 
     if (suggestions.length && isOpen) {
-      goToTicker(suggestions[activeIndex]?.symbol ?? suggestions[0].symbol);
+      goToTicker(suggestions[activeIndex]?.symbol ?? suggestions[0].symbol, suggestions[activeIndex] ?? suggestions[0]);
       return;
     }
 
@@ -123,7 +159,7 @@ export function StockAutocomplete({
 
     if (event.key === "Enter" && isOpen) {
       event.preventDefault();
-      goToTicker(suggestions[activeIndex]?.symbol ?? suggestions[0].symbol);
+      goToTicker(suggestions[activeIndex]?.symbol ?? suggestions[0].symbol, suggestions[activeIndex] ?? suggestions[0]);
     }
 
     if (event.key === "Escape") {
@@ -170,7 +206,7 @@ export function StockAutocomplete({
       {isOpen && normalizedQuery.length >= 2 ? (
         <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white shadow-xl">
           {isLoading ? (
-            <div className="px-4 py-3 text-sm text-[var(--color-muted)]">Buscando ações...</div>
+            <div className="px-4 py-3 text-sm text-[var(--color-muted)]">Buscando ativos...</div>
           ) : suggestions.length ? (
             <div className="max-h-80 overflow-y-auto py-2">
               {suggestions.map((item, index) => (
@@ -178,7 +214,7 @@ export function StockAutocomplete({
                   key={`${item.symbol}-${index}`}
                   type="button"
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => goToTicker(item.symbol)}
+                  onClick={() => goToTicker(item.symbol, item)}
                   className={index === activeIndex
                     ? "flex w-full items-center gap-3 bg-[var(--color-background-alt)] px-4 py-3 text-left"
                     : "flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--color-background-alt)]"
@@ -202,7 +238,7 @@ export function StockAutocomplete({
             </div>
           ) : (
             <div className="px-4 py-3 text-sm text-[var(--color-muted)]">
-              Nenhuma ação encontrada. Você ainda pode digitar o ticker completo.
+              Nenhum ativo encontrado. Você ainda pode digitar o ticker completo.
             </div>
           )}
         </div>

@@ -1,17 +1,17 @@
-# Versão
+# Foco Invest - v1.53.18
 
-## v1.53.17 — Ações, busca e início da atualização de FIIs
+Correção de match CVM para NTCO3/WIZC3 e publicação segura do snapshot.
 
-- A tela `/acoes` lista 40 ações de referência/maior negociação.
-- A tela `/fiis` lista 30 FIIs de referência/maior negociação.
-- Busca de ticker consulta fallback, snapshot local, Supabase e BRAPI.
-- Busca por `wizc` passa a encontrar/abrir `WIZC3`.
-- Snapshot exporta ações e FIIs no mesmo índice.
-- Criado workflow `Atualizar FIIs`.
-- Indicadores-chave usam o primeiro valor útil disponível na base histórica quando o registro mais recente estiver incompleto.
-- Tabelas fundamentalistas ocultam linhas 100% vazias para reduzir ruído visual.
+- NTCO3 passa a ter hints de match com NATURA/NATURA &CO.
+- WIZC3 mantém compatibilidade de busca e passa a entrar na validação do snapshot.
+- Snapshot só é publicado quando a validação passa, evitando snapshot parcial.
+- Validação mínima inclui PETR3, PETR4, ABEV3, LREN3, RENT3, CMIG4, SUZB3, WEGE3, MGLU3, NTCO3 e WIZC3.
 
-## v1.53.16 — Ações B3 histórico completo
 
-- Ligação de dados históricos de ações via snapshot local/remoto.
-- Atualização ampla de ações da B3 antes da etapa de FIIs.
+## v1.53.19
+
+- Corrige roteamento/busca entre ações e FIIs.
+- Cria página própria para `/fiis/[ticker]`.
+- Complementa FIIs via rotina Python `update_fii_fundamentus.py`.
+- Ajusta workflows para publicar snapshot em atualização manual e agendada.
+- Atualiza cache para `v15319`.

@@ -90,6 +90,7 @@ export type RelatedAsset = {
 
 export type StockData = {
   ticker: string;
+  assetKind?: "stock" | "fii";
   companyName: string;
   fullName?: string;
   sector: string;

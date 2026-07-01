@@ -93,7 +93,7 @@ def export_ticker(client: SupabaseRestClient, ticker: str, output_dir: Path, lim
     })
 
     payload = {
-        "version": "v1.53.17",
+        "version": "v1.53.19",
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "ticker": ticker,
         "asset": assets[0],
@@ -148,7 +148,7 @@ def main() -> int:
             summaries.append(summary)
 
     index_payload = {
-        "version": "v1.53.17",
+        "version": "v1.53.19",
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "total": len(summaries),
         "tickers": [item["ticker"] for item in summaries],

@@ -64,6 +64,11 @@ jobs:
         run: |
           python scripts/update_base_inicial.py --fiis --sleep ${{ inputs.sleep || '1' }}
 
+      - name: Complementar indicadores públicos dos FIIs
+        shell: bash
+        run: |
+          python scripts/update_fii_fundamentus.py --all --sleep ${{ inputs.sleep || '1' }}
+
       - name: Conferir base
         if: always()
         run: |

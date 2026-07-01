@@ -27,7 +27,7 @@ import {
   toFiniteNumber,
 } from "@/lib/utils/formatters";
 
-const STOCK_CACHE_VERSION = "v15317";
+const STOCK_CACHE_VERSION = "v15319";
 const STOCK_CACHE_TTL_MS = 15 * 60 * 1000;
 const STOCK_STALE_TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -452,6 +452,17 @@ function hasMissingImportantData(stock: StockData): boolean {
     hasUsefulText(stock.dividendSummary.yield12m) &&
     !isPlausibleDividendValue(stock.dividendSummary.yield12m, isLikelyFii(stock));
 
+  const isFii = isLikelyFii(stock);
+
+  if (isFii) {
+    return (
+      indicatorMissingRatio >= 0.15 ||
+      financialScore <= 12 ||
+      dayRowsMissing >= 2 ||
+      dividendInvalid
+    );
+  }
+
   return (
     indicatorMissingRatio >= 0.35 ||
     financialScore <= 6 ||
@@ -469,6 +480,7 @@ function mergeStockData(primary: StockData, fallback: StockData): StockData {
 
   return {
     ...primary,
+    assetKind: primary.assetKind ?? fallback.assetKind,
     companyName: hasUsefulText(primary.companyName) ? primary.companyName : fallback.companyName,
     fullName: primary.fullName ?? fallback.fullName,
     sector: hasUsefulText(primary.sector) ? primary.sector : fallback.sector,

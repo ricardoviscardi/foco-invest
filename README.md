@@ -8,7 +8,7 @@ Projeto Next.js + TypeScript + Tailwind para consulta pública de ações brasil
 
 ## Versão atual
 
-**v1.53.17 — Ações, busca e início da atualização de FIIs**
+**v1.53.18 — Ações, busca e início da atualização de FIIs**
 
 - `/acoes` com 40 ações de referência/maior negociação.
 - `/fiis` com 30 FIIs de referência/maior negociação.
@@ -96,3 +96,12 @@ Correção do fluxo de dados em rede local bloqueada: Supabase > snapshot local 
 ## v1.53.12 — Snapshot obrigatório para dados históricos locais
 
 Correção do fluxo de dados para redes que bloqueiam o Supabase: adiciona workflow independente para recriar/publicar snapshot, valida cobertura mínima de demonstrativos e melhora o diagnóstico quando a página estiver usando apenas dados públicos parciais.
+
+
+## v1.53.19
+
+- Corrige roteamento/busca entre ações e FIIs.
+- Cria página própria para `/fiis/[ticker]`.
+- Complementa FIIs via rotina Python `update_fii_fundamentus.py`.
+- Ajusta workflows para publicar snapshot em atualização manual e agendada.
+- Atualiza cache para `v15319`.

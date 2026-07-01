@@ -1354,6 +1354,7 @@ export function createUnavailableStock(
 
   return {
     ticker: normalized,
+    assetKind: "stock",
     companyName: normalized,
     sector: "Não disponível",
     source: "Base Foco Invest",
@@ -1925,6 +1926,7 @@ export function mapBrapiToStockData(input: {
 
   return {
     ticker: symbol,
+    assetKind: isFii ? "fii" : "stock",
     companyName,
     fullName: fullName ?? undefined,
     sector: isFii

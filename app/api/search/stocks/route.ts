@@ -5,12 +5,20 @@ import { stockSuggestionsFallback } from "@/lib/stocks/stock-list";
 import { searchSupabaseAssets } from "@/lib/stocks/supabase-stock-repository";
 import { searchLocalSnapshotAssets } from "@/lib/stocks/local-snapshot-repository";
 
-const SEARCH_CACHE_VERSION = "v15317";
+const SEARCH_CACHE_VERSION = "v15319";
 const SEARCH_CACHE_TTL_MS = 60 * 60 * 1000;
 const SEARCH_STALE_TTL_MS = 12 * 60 * 60 * 1000;
 
 function normalizeQuery(value: string): string {
   return value.trim().toUpperCase().replace(/[^A-Z0-9 ]/g, "");
+}
+
+function fallbackType(item: { symbol: string; sector?: string }): string {
+  const symbol = item.symbol.toUpperCase();
+  const sector = String(item.sector ?? "").toLowerCase();
+  const stockUnits = new Set(["BPAC11", "ENGI11", "KLBN11", "SANB11", "SAPR11", "TAEE11"]);
+  if ((sector.includes("fii") || sector.includes("fundo") || symbol.endsWith("11")) && !stockUnits.has(symbol)) return "fii";
+  return "stock";
 }
 
 function fallbackSearch(query: string): StockSearchResult[] {
@@ -22,7 +30,7 @@ function fallbackSearch(query: string): StockSearchResult[] {
       const searchable = `${item.symbol} ${item.name} ${item.sector ?? ""}`.toUpperCase();
       return searchable.includes(directQuery) || searchable.includes(queryWithDefaultOn);
     })
-    .map((item) => ({ ...item, source: "fallback" as const }))
+    .map((item) => ({ ...item, type: fallbackType(item), source: "fallback" as const }))
     .slice(0, 8);
 }
 

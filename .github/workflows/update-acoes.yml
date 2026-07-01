@@ -130,18 +130,18 @@ jobs:
         run: |
           python scripts/check_supabase_data.py
 
-      - name: Exportar snapshot local de ações
-        if: always()
+      - name: Exportar snapshot local de ações e FIIs
+        if: ${{ success() }}
         run: |
           python scripts/export_stock_snapshots.py --all-assets --output public/data/snapshots/stocks --limit-history 2600
 
       - name: Validar snapshot de ações
-        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.publicar_snapshot == 'sim' }}
+        if: ${{ success() && github.event_name == 'workflow_dispatch' && inputs.publicar_snapshot == 'sim' }}
         run: |
-          python scripts/verify_snapshot_coverage.py --min-annual-years 3 --min-history 200
+          python scripts/verify_snapshot_coverage.py --ticker PETR3 --ticker PETR4 --ticker ABEV3 --ticker LREN3 --ticker RENT3 --ticker CMIG4 --ticker SUZB3 --ticker WEGE3 --ticker MGLU3 --ticker NTCO3 --ticker WIZC3 --min-annual-years 3 --min-history 200
 
       - name: Salvar snapshot local de ações
-        if: always()
+        if: ${{ success() || failure() }}
         uses: actions/upload-artifact@v4
         with:
           name: snapshot-local-acoes
@@ -151,7 +151,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Publicar snapshot no repositório
-        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.publicar_snapshot == 'sim' }}
+        if: ${{ success() && (github.event_name == 'schedule' || inputs.publicar_snapshot == 'sim') }}
         shell: bash
         run: |
           git config user.name "github-actions[bot]"

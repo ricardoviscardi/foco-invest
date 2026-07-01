@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 type FundamentalAnalysisTableProps = {
   data: FundamentalAnalysisData;
   indicators?: StockIndicator[];
+  assetKind?: "stock" | "fii";
 };
 
 type TabKey = "indicators" | "balanceSheet" | "incomeStatement" | "cashFlow";
@@ -51,7 +52,7 @@ function isOnlyCurrentTable(table: AnalysisTable) {
   return tableHasData(table) && !hasHistoricalColumns(table);
 }
 
-export function FundamentalAnalysisTable({ data }: FundamentalAnalysisTableProps) {
+export function FundamentalAnalysisTable({ data, assetKind = "stock" }: FundamentalAnalysisTableProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("indicators");
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("annual");
 
@@ -130,16 +131,25 @@ export function FundamentalAnalysisTable({ data }: FundamentalAnalysisTableProps
         <>
           {onlyCurrent ? (
             <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-              A tabela abaixo está com dados atuais/parciais porque a base histórica completa não foi carregada nesta execução.
-              Para exibir os últimos anos em Indicadores, Balanço, DRE e Fluxo de Caixa, gere e publique o snapshot pelo GitHub Actions e depois rode <strong>git pull</strong>.
+              {assetKind === "fii" ? (
+                <>
+                  Este fundo está usando dados atuais/parciais. Para ampliar histórico de P/VP, VP/Cota, rendimentos e proventos, rode a rotina <strong>Atualizar FIIs</strong> no GitHub Actions com snapshot publicado e depois rode <strong>git pull</strong>.
+                </>
+              ) : (
+                <>
+                  A tabela abaixo está com dados atuais/parciais porque a base histórica completa não foi carregada nesta execução.
+                  Para exibir os últimos anos em Indicadores, Balanço, DRE e Fluxo de Caixa, gere e publique o snapshot pelo GitHub Actions e depois rode <strong>git pull</strong>.
+                </>
+              )}
             </div>
           ) : null}
           <AnalysisRows table={table} activeTab={effectiveTab} />
         </>
       ) : (
         <div className="mt-6 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-background-alt)] p-6 text-sm text-[var(--color-muted)]">
-          A base fundamentalista deste ativo ainda não possui demonstrativos históricos consolidados.
-          Rode a atualização CVM completa e confira a conexão em /api/data/status.
+{assetKind === "fii"
+            ? "Este fundo ainda não possui dados fundamentalistas consolidados no snapshot. Rode Atualizar FIIs com snapshot publicado e depois git pull."
+            : "A base fundamentalista deste ativo ainda não possui demonstrativos históricos consolidados. Rode a atualização CVM completa e confira a conexão em /api/data/status."}
         </div>
       )}
     </Card>

@@ -63,7 +63,7 @@ def verify_ticker(snapshot_dir: Path, ticker: str, min_annual_years: int, min_hi
 def main() -> int:
     parser = argparse.ArgumentParser(description="Valida se o snapshot exportado tem dados suficientes para as páginas de ações.")
     parser.add_argument("--snapshot-dir", default=str(DEFAULT_SNAPSHOT_DIR))
-    parser.add_argument("--ticker", action="append", default=["PETR3", "PETR4", "ABEV3", "LREN3", "RENT3", "CMIG4", "SUZB3"])
+    parser.add_argument("--ticker", action="append", default=["PETR3", "PETR4", "ABEV3", "LREN3", "RENT3", "CMIG4", "SUZB3", "WEGE3", "MGLU3", "NTCO3", "WIZC3"])
     parser.add_argument("--min-annual-years", type=int, default=3)
     parser.add_argument("--min-history", type=int, default=200)
     args = parser.parse_args()

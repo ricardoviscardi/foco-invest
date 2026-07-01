@@ -1587,6 +1587,7 @@ const companyInfo = isFii
 
 return {
   ticker: asset.ticker,
+  assetKind: asset.kind,
   companyName: cleanName,
   fullName: cleanCompanyName === cleanName ? undefined : cleanCompanyName,
   sector: cleanSector,

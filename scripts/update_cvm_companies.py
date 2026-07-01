@@ -65,6 +65,8 @@ TICKER_HINTS: dict[str, list[str]] = {
     "HYPE3":["HYPERA"], "EMBR3":["EMBRAER"], "BEEF3":["MINERVA"], "MRFG3":["MARFRIG"], "CSNA3":["SIDERURGICA NACIONAL"],
     "USIM5":["USIMINAS"], "VBBR3":["VIBRA ENERGIA"], "UGPA3":["ULTRAPAR"], "ENEV3":["ENEVA"], "EQTL3":["EQUATORIAL"],
     "NEOE3":["NEOENERGIA"], "SANB11":["SANTANDER BRASIL","BANCO SANTANDER"], "SAPR11":["SANEPAR"], "PSSA3":["PORTO SEGURO"],
+    "NTCO3":["NATURA", "NATURA &CO", "NATURA CO HOLDING", "NATURA COSMETICOS", "GRUPO NATURA"],
+    "WIZC3":["WIZ", "WIZ CO", "WIZ SOLUCOES", "WIZ SOLUÇÕES", "WIZ CO PARTICIPACOES"],
 }
 
 def norm(v: Any) -> str:
@@ -146,11 +148,39 @@ def load_assets(client: SupabaseRestClient, tickers: list[str]) -> list[dict[str
         return client.select("assets", {"select":"ticker,kind,name,company_name,cnpj,sector,industry,website", "ticker":f"in.({','.join(tickers)})", "kind":"eq.stock", "limit":"1000"})
     return client.select("assets", {"select":"ticker,kind,name,company_name,cnpj,sector,industry,website", "kind":"eq.stock", "limit":"1000"})
 
+GENERIC_NAME_WORDS = {
+    "GRUPO", "CIA", "COMPANHIA", "SA", "S", "A", "ON", "PN", "NM", "N1", "N2",
+    "PART", "PARTICIPACOES", "PARTICIPAÇÕES", "HOLDING", "HOLDINGS", "BRASIL",
+    "INDUSTRIA", "INDUSTRIAS", "COMERCIO", "SERVICOS", "SERVIÇOS", "BANCO",
+    "ENERGIA", "TRANSMISSORA", "LOGISTICA", "LOGÍSTICA", "SANEAMENTO"
+}
+
+def _brand_terms_from_asset(asset: dict[str, Any]) -> list[str]:
+    """Extrai termos curtos de marca para melhorar o match com a CVM.
+
+    O cadastro da CVM muitas vezes usa a razão social completa, enquanto a
+    origem de preços traz nomes como "GRUPO NATURA ON NM". Sem um termo de
+    marca, o match pode falhar e o ativo fica sem histórico fundamentalista.
+    """
+    terms_out: list[str] = []
+    for key in ["company_name", "name"]:
+        raw = norm(asset.get(key))
+        if not raw:
+            continue
+        words = [w for w in raw.split() if len(w) >= 4 and w not in GENERIC_NAME_WORDS]
+        if words:
+            # Primeiro termo de marca e, quando existir, os dois primeiros juntos.
+            terms_out.append(words[0])
+            if len(words) >= 2:
+                terms_out.append(" ".join(words[:2]))
+    return terms_out
+
 def terms(asset: dict[str,Any]) -> list[str]:
     ticker=str(asset.get("ticker") or "").upper()
     out=[]; out.extend(TICKER_HINTS.get(ticker,[]))
     for k in ["company_name","name"]:
         if asset.get(k): out.append(str(asset[k]))
+    out.extend(_brand_terms_from_asset(asset))
     seen=set(); final=[]
     for item in out:
         n=norm(item)
@@ -175,6 +205,10 @@ def match_company(asset: dict[str,Any], cad: pd.DataFrame) -> dict[str,Any]|None
             for name in names:
                 s=SequenceMatcher(None,t,name).ratio()*100
                 if t in name or name in t: s=max(s,92)
+                # Termos de marca fortes, como NATURA ou WIZ, devem casar quando aparecem
+                # como palavra no nome CVM, mesmo se a razão social completa for diferente.
+                if len(t) >= 5 and t in name.split():
+                    s=max(s,90)
                 if len(t)<=4 and t not in name.split(): s=min(s,60)
                 if s>score: score=s; term_hit=t
         if "SIT" in cad.columns and "ATIVO" in norm(r.get("SIT")): score += 3

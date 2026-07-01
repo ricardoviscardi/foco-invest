@@ -114,6 +114,7 @@ export default async function StockPage({ params }: StockPageProps) {
         <FundamentalAnalysisTable
           data={stock.fundamentalAnalysis}
           indicators={stock.indicators}
+          assetKind={stock.assetKind}
         />
         <DividendsTable dividends={stock.dividends} />
       </div>
