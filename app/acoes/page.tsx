@@ -19,7 +19,7 @@ export default function StocksPage() {
       <SectionHeader
         eyebrow="Ações"
         title="Consulte ações brasileiras"
-        description="Escolha uma empresa ou pesquise diretamente pelo ticker para visualizar cotação, gráfico, oscilações, indicadores-chave, análise fundamentalista e dividendos."
+        description="Veja as 40 ações mais negociadas e pesquise diretamente pelo ticker para visualizar cotação, gráfico, oscilações, indicadores-chave, análise fundamentalista e dividendos."
       />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

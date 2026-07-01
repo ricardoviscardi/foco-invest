@@ -255,9 +255,20 @@ def value(df: pd.DataFrame, ref: str, accounts: list[str], keywords: list[str]) 
     if period.empty and col: period=df[df[col].astype(str).str[:4]==ref[:4]]
     if period.empty: return None
     if "CD_CONTA" in period.columns:
+        codes=period["CD_CONTA"].astype(str).str.strip()
         for acc in accounts:
-            m=period[period["CD_CONTA"].astype(str).str.strip()==acc]
+            m=period[codes==acc]
             if not m.empty:
+                n=to_num(m.iloc[0].get("VL_CONTA")); return None if n is None else n*mult(m.iloc[0])
+        # Algumas companhias detalham a conta em subcontas sem publicar a linha sintética
+        # exata. Neste caso usamos a subconta mais próxima como fallback, evitando que
+        # Balanço, DRE e Fluxo de Caixa fiquem vazios sem necessidade.
+        for acc in accounts:
+            prefix=acc + "."
+            m=period[codes.str.startswith(prefix, na=False)].copy()
+            if not m.empty:
+                m["_depth"] = m["CD_CONTA"].astype(str).str.count(r"\.")
+                m=m.sort_values(["_depth", "CD_CONTA"])
                 n=to_num(m.iloc[0].get("VL_CONTA")); return None if n is None else n*mult(m.iloc[0])
     if "DS_CONTA" in period.columns:
         desc=period["DS_CONTA"].map(norm)
@@ -422,6 +433,25 @@ def rows_from_zip(
             capex = value_for(frames["dfc"], reference_date, ["6.02.01"], ["Imobilizado", "Ativo Imobilizado"])
             dividends_paid = value_for(frames["dfc"], reference_date, ["6.03.04"], ["Dividendos", "Juros sobre Capital Próprio", "Juros sobre Capital Proprio"])
             net_change_cash = value_for(frames["dfc"], reference_date, ["6.05"], ["Aumento Redução de Caixa", "Aumento Reducao de Caixa", "Variação de Caixa", "Variacao de Caixa"])
+
+            if non_current_assets is None and total_assets is not None and current_assets is not None:
+                non_current_assets = total_assets - current_assets
+            if total_liabilities is None and total_assets is not None and equity is not None:
+                total_liabilities = total_assets - equity
+            if non_current_liabilities is None and total_liabilities is not None and current_liabilities is not None:
+                non_current_liabilities = total_liabilities - current_liabilities
+            if current_liabilities is None and total_liabilities is not None and non_current_liabilities is not None:
+                current_liabilities = total_liabilities - non_current_liabilities
+            if cost_of_revenue is None and revenue is not None and gross_profit is not None:
+                cost_of_revenue = gross_profit - revenue
+            if operating_expenses is None and gross_profit is not None and ebit is not None:
+                operating_expenses = ebit - gross_profit
+            if financial_result is None and income_before_tax is not None and ebit is not None:
+                financial_result = income_before_tax - ebit
+            if income_before_tax is None and net_income is not None and income_tax is not None:
+                income_before_tax = net_income - income_tax
+            if net_change_cash is None and any(v is not None for v in [operating_cash_flow, investing_cash_flow, financing_cash_flow]):
+                net_change_cash = (operating_cash_flow or 0) + (investing_cash_flow or 0) + (financing_cash_flow or 0)
 
             free_cash_flow = None
             if operating_cash_flow is not None or capex is not None:

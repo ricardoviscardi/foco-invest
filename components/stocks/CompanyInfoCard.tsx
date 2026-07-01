@@ -6,10 +6,23 @@ type CompanyInfoCardProps = {
   rows: CompanyInfoRow[];
 };
 
+function displayValue(row: CompanyInfoRow) {
+  const value = sanitizeDisplayText(row.value) || "Não disponível";
+
+  if (row.label === "Site" && value !== "Não disponível") {
+    return value
+      .replace(/^https?:\/\//i, "")
+      .replace(/^www\./i, "")
+      .replace(/\/$/, "");
+  }
+
+  return value;
+}
+
 function normalizeRows(rows: CompanyInfoRow[]) {
   const sanitizedRows = rows.map((row) => ({
     label: row.label,
-    value: sanitizeDisplayText(row.value) || "Não disponível"
+    value: displayValue(row)
   }));
 
   const sector = sanitizedRows.find((row) => row.label === "Setor")?.value;
@@ -40,7 +53,7 @@ export function CompanyInfoCard({ rows }: CompanyInfoCardProps) {
         {visibleRows.map((row) => (
           <div key={row.label} className="flex items-start justify-between gap-4 border-b border-[var(--color-border)] pb-3 last:border-b-0 last:pb-0">
             <p className="text-sm text-[var(--color-muted)]">{row.label}</p>
-            <p className="max-w-[62%] break-words text-right text-sm font-bold text-[var(--color-text)]">
+            <p className="min-w-0 max-w-[58%] break-all text-right text-sm font-bold leading-5 text-[var(--color-text)]">
               {row.value}
             </p>
           </div>

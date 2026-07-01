@@ -32,18 +32,23 @@ def select_all(client: SupabaseRestClient, table: str, params: dict[str, Any], p
     return rows
 
 
-def get_tickers(client: SupabaseRestClient, tickers: list[str], all_stocks: bool) -> list[str]:
+def get_tickers(client: SupabaseRestClient, tickers: list[str], all_stocks: bool, all_fiis: bool, all_assets: bool) -> list[str]:
     if tickers:
         return sorted({normalize_ticker(t) for t in tickers if normalize_ticker(t)})
 
-    if not all_stocks:
-        raise RuntimeError("Informe ao menos --ticker ou use --all-stocks.")
+    if not (all_stocks or all_fiis or all_assets):
+        raise RuntimeError("Informe ao menos --ticker, --all-stocks, --all-fiis ou --all-assets.")
 
-    assets = select_all(client, "assets", {
+    params = {
         "select": "ticker",
-        "kind": "eq.stock",
         "order": "ticker.asc",
-    }, page_size=1000)
+    }
+    if all_stocks and not all_assets:
+        params["kind"] = "eq.stock"
+    if all_fiis and not all_assets:
+        params["kind"] = "eq.fii"
+
+    assets = select_all(client, "assets", params, page_size=1000)
     return [normalize_ticker(row.get("ticker", "")) for row in assets if row.get("ticker")]
 
 
@@ -88,7 +93,7 @@ def export_ticker(client: SupabaseRestClient, ticker: str, output_dir: Path, lim
     })
 
     payload = {
-        "version": "v1.53.11",
+        "version": "v1.53.17",
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "ticker": ticker,
         "asset": assets[0],
@@ -121,6 +126,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Exporta snapshot de dados do Supabase para testes em redes bloqueadas e publicação no repositório.")
     parser.add_argument("--ticker", action="append", default=[], help="Ticker específico. Pode ser usado várias vezes.")
     parser.add_argument("--all-stocks", action="store_true", help="Exporta todas as ações cadastradas em assets.kind=stock.")
+    parser.add_argument("--all-fiis", action="store_true", help="Exporta todos os FIIs cadastrados em assets.kind=fii.")
+    parser.add_argument("--all-assets", action="store_true", help="Exporta ações e FIIs cadastrados em assets.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="Pasta de saída dos JSONs.")
     parser.add_argument("--limit-history", type=int, default=2600, help="Máximo de linhas de histórico por ativo.")
     args = parser.parse_args()
@@ -132,7 +139,7 @@ def main() -> int:
     ))
 
     output_dir = Path(args.output)
-    tickers = get_tickers(client, args.ticker, args.all_stocks)
+    tickers = get_tickers(client, args.ticker, args.all_stocks, args.all_fiis, args.all_assets)
     summaries = []
     for index, ticker in enumerate(tickers, start=1):
         print({"progress": f"{index}/{len(tickers)}", "ticker": ticker})
@@ -141,7 +148,7 @@ def main() -> int:
             summaries.append(summary)
 
     index_payload = {
-        "version": "v1.53.11",
+        "version": "v1.53.17",
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "total": len(summaries),
         "tickers": [item["ticker"] for item in summaries],

@@ -23,7 +23,7 @@ export default function FIIsPage() {
       <SectionHeader
         eyebrow="FIIs"
         title="Consulte fundos imobiliários"
-        description="Escolha um FII ou pesquise diretamente pelo ticker para visualizar cotação, gráfico, oscilações, dividendos e informações disponíveis nas fontes integradas."
+        description="Veja os 30 FIIs mais negociados e pesquise diretamente pelo ticker para visualizar cotação, gráfico, oscilações, dividendos e dados disponíveis nas fontes integradas."
       />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

@@ -21,7 +21,7 @@ export type StockSearchResult = {
   sector?: string;
   logoUrl?: string;
   type?: string;
-  source: "brapi.dev" | "fallback" | "supabase";
+  source: "brapi.dev" | "fallback" | "supabase" | "snapshot";
 };
 
 type BrapiResponse = {

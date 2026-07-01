@@ -27,7 +27,7 @@ import {
   toFiniteNumber,
 } from "@/lib/utils/formatters";
 
-const STOCK_CACHE_VERSION = "v15312";
+const STOCK_CACHE_VERSION = "v15317";
 const STOCK_CACHE_TTL_MS = 15 * 60 * 1000;
 const STOCK_STALE_TTL_MS = 6 * 60 * 60 * 1000;
 

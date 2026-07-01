@@ -1,28 +1,36 @@
-name: Recriar snapshot de ações
+name: Atualizar FIIs
 
 on:
   workflow_dispatch:
     inputs:
+      sleep:
+        description: "Pausa entre FIIs"
+        required: false
+        default: "1"
       publicar_snapshot:
-        description: "Publicar snapshot no repositório?"
-        required: true
+        description: "Publicar snapshot de FIIs no repositório"
+        required: false
         default: "sim"
         type: choice
         options:
           - sim
           - nao
+  schedule:
+    - cron: "10 1 * * 2,5"
 
 permissions:
   contents: write
 
 jobs:
-  snapshot-acoes:
+  atualizar-fiis:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 240
 
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      BRAPI_API_TOKEN: ${{ secrets.BRAPI_API_TOKEN }}
+      SUPABASE_WRITE_MODE: direct
       PYTHONUNBUFFERED: "1"
 
     steps:
@@ -51,35 +59,51 @@ jobs:
             exit 1
           fi
 
-      - name: Exportar snapshot completo
+      - name: Atualizar preços, histórico e dividendos dos FIIs
+        shell: bash
         run: |
-          rm -rf public/data/snapshots
+          python scripts/update_base_inicial.py --fiis --sleep ${{ inputs.sleep || '1' }}
+
+      - name: Conferir base
+        if: always()
+        run: |
+          python scripts/check_supabase_data.py
+
+      - name: Exportar snapshot local de FIIs
+        if: always()
+        run: |
           python scripts/export_stock_snapshots.py --all-assets --output public/data/snapshots/stocks --limit-history 2600
 
-      - name: Validar snapshot
-        run: |
-          python scripts/verify_snapshot_coverage.py --min-annual-years 3 --min-history 200
-
-      - name: Salvar artifact
+      - name: Salvar snapshot local de FIIs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: snapshot-local-acoes
+          name: snapshot-local-fiis
           path: |
             public/data/snapshots/index.json
             public/data/snapshots/stocks/*.json
-          if-no-files-found: error
+          if-no-files-found: ignore
 
-      - name: Publicar snapshot no repositório
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publicar_snapshot == 'sim' }}
+      - name: Publicar snapshot de FIIs no repositório
+        if: ${{ always() && (github.event_name == 'schedule' || inputs.publicar_snapshot == 'sim') }}
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/data/snapshots
           if git diff --cached --quiet; then
-            echo "Nenhuma alteração de snapshot para publicar."
+            echo "Nenhuma alteração de snapshot de FIIs para publicar."
           else
-            git commit -m "atualiza snapshot completo de ações"
-            git pull --rebase origin main
+            git commit -m "atualiza snapshot local de FIIs"
             git push
           fi
+
+      - name: Salvar relatórios
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorios-atualizacao-fiis
+          path: |
+            reports/*.json
+            reports/*.csv
+          if-no-files-found: ignore

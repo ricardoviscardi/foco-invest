@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from datetime import date
 
 
 def run(command: list[str], *, optional: bool = False) -> bool:
@@ -16,12 +17,22 @@ def run(command: list[str], *, optional: bool = False) -> bool:
     return True
 
 
+def default_dfp_years() -> list[str]:
+    current_year = date.today().year
+    return [str(year) for year in range(current_year - 1, current_year - 6, -1)]
+
+
+def default_itr_years() -> list[str]:
+    current_year = date.today().year
+    return [str(current_year), str(current_year - 1)]
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Atualiza toda a base monitorada de ações.")
     parser.add_argument("--sleep", type=float, default=1.0)
     parser.add_argument("--with-itr", action="store_true")
-    parser.add_argument("--years", nargs="+", default=["2024", "2023", "2022", "2021"])
-    parser.add_argument("--itr-years", nargs="+", default=["2025", "2024"])
+    parser.add_argument("--years", nargs="+", default=default_dfp_years())
+    parser.add_argument("--itr-years", nargs="+", default=default_itr_years())
     parser.add_argument("--skip-prices", action="store_true", help="Pula atualização de preço/histórico/proventos.")
     parser.add_argument("--skip-cvm", action="store_true", help="Pula atualização CVM.")
     parser.add_argument("--prices-optional", action="store_true", help="Continua para CVM mesmo se preços falharem.")

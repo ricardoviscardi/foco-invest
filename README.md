@@ -8,6 +8,16 @@ Projeto Next.js + TypeScript + Tailwind para consulta pública de ações brasil
 
 ## Versão atual
 
+**v1.53.17 — Ações, busca e início da atualização de FIIs**
+
+- `/acoes` com 40 ações de referência/maior negociação.
+- `/fiis` com 30 FIIs de referência/maior negociação.
+- Busca com snapshot local e correção para tickers digitados sem número final, como `wizc` -> `WIZC3`.
+- Novo workflow `Atualizar FIIs`.
+- Snapshots passam a poder reunir ações e FIIs no mesmo índice.
+
+
+
 **v1.53.9 — saneamento estrutural da ligação de dados das páginas de ações**
 
 Esta versão corrige a ligação entre a página de ações e a base consolidada no Supabase, principalmente depois da migração das atualizações para GitHub Actions e dos problemas locais de rede/VPN.

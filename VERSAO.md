@@ -1,12 +1,17 @@
-# Versão atual
+# Versão
 
-v1.53.12 — Snapshot remoto para ações da B3 e saneamento de dados locais
+## v1.53.17 — Ações, busca e início da atualização de FIIs
 
-## Observação
+- A tela `/acoes` lista 40 ações de referência/maior negociação.
+- A tela `/fiis` lista 30 FIIs de referência/maior negociação.
+- Busca de ticker consulta fallback, snapshot local, Supabase e BRAPI.
+- Busca por `wizc` passa a encontrar/abrir `WIZC3`.
+- Snapshot exporta ações e FIIs no mesmo índice.
+- Criado workflow `Atualizar FIIs`.
+- Indicadores-chave usam o primeiro valor útil disponível na base histórica quando o registro mais recente estiver incompleto.
+- Tabelas fundamentalistas ocultam linhas 100% vazias para reduzir ruído visual.
 
-Antes de avançar para FIIs, validar ações com `completo_com_itr`, `universo=todas_acoes_b3` e `publicar_snapshot=sim`.
+## v1.53.16 — Ações B3 histórico completo
 
-
-## v1.53.12 — Snapshot obrigatório para dados históricos locais
-
-Correção do fluxo de dados para redes que bloqueiam o Supabase: adiciona workflow independente para recriar/publicar snapshot, valida cobertura mínima de demonstrativos e melhora o diagnóstico quando a página estiver usando apenas dados públicos parciais.
+- Ligação de dados históricos de ações via snapshot local/remoto.
+- Atualização ampla de ações da B3 antes da etapa de FIIs.

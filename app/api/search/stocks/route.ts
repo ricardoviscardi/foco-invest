@@ -3,7 +3,9 @@ import { searchBrapiStocks, type StockSearchResult } from "@/lib/stocks/brapi-cl
 import { getCachedValue, setCachedValue } from "@/lib/stocks/api-cache";
 import { stockSuggestionsFallback } from "@/lib/stocks/stock-list";
 import { searchSupabaseAssets } from "@/lib/stocks/supabase-stock-repository";
+import { searchLocalSnapshotAssets } from "@/lib/stocks/local-snapshot-repository";
 
+const SEARCH_CACHE_VERSION = "v15317";
 const SEARCH_CACHE_TTL_MS = 60 * 60 * 1000;
 const SEARCH_STALE_TTL_MS = 12 * 60 * 60 * 1000;
 
@@ -12,10 +14,13 @@ function normalizeQuery(value: string): string {
 }
 
 function fallbackSearch(query: string): StockSearchResult[] {
+  const directQuery = query.trim().toUpperCase();
+  const queryWithDefaultOn = /^[A-Z]{4}$/.test(directQuery) ? `${directQuery}3` : directQuery;
+
   return stockSuggestionsFallback
     .filter((item) => {
       const searchable = `${item.symbol} ${item.name} ${item.sector ?? ""}`.toUpperCase();
-      return searchable.includes(query);
+      return searchable.includes(directQuery) || searchable.includes(queryWithDefaultOn);
     })
     .map((item) => ({ ...item, source: "fallback" as const }))
     .slice(0, 8);
@@ -40,7 +45,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ query, results: [] });
   }
 
-  const cacheKey = `search:${query}`;
+  const cacheKey = `${SEARCH_CACHE_VERSION}:search:${query}`;
   const cached = getCachedValue<StockSearchResult[]>(cacheKey);
 
   if (cached.state === "hit" && cached.value) {
@@ -48,9 +53,10 @@ export async function GET(request: Request) {
   }
 
   const fallbackResults = fallbackSearch(query);
+  const snapshotResults = searchLocalSnapshotAssets(query, 8);
   const supabaseResults = await searchSupabaseAssets(query, 8);
   const apiResults = await searchBrapiStocks(query, 8);
-  const results = mergeResults([...supabaseResults, ...apiResults], fallbackResults);
+  const results = mergeResults([...snapshotResults, ...supabaseResults, ...apiResults], fallbackResults);
 
   if (results.length) {
     setCachedValue(cacheKey, results, SEARCH_CACHE_TTL_MS, SEARCH_STALE_TTL_MS);

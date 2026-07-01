@@ -6,7 +6,7 @@ on:
       modo:
         description: "O que atualizar?"
         required: true
-        default: "completo_sem_itr"
+        default: "completo_com_itr"
         type: choice
         options:
           - precos
@@ -20,15 +20,15 @@ on:
       anos_dfp:
         description: "Anos DFP separados por espaço"
         required: false
-        default: "2024 2023 2022 2021"
+        default: "2025 2024 2023 2022 2021"
       anos_itr:
         description: "Anos ITR separados por espaço"
         required: false
-        default: "2025 2024"
+        default: "2026 2025"
       universo:
         description: "Universo de ações"
         required: false
-        default: "base_ampliada"
+        default: "todas_acoes_b3"
         type: choice
         options:
           - base_ampliada
@@ -92,7 +92,7 @@ jobs:
       - name: Atualização agendada de preços
         if: ${{ github.event_name == 'schedule' }}
         run: |
-          python scripts/update_base_inicial.py --stocks --sleep 1
+          python scripts/update_base_inicial.py --b3-stocks --sleep 1
 
       - name: Atualizar apenas preços
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.modo == 'precos' }}
@@ -133,7 +133,7 @@ jobs:
       - name: Exportar snapshot local de ações
         if: always()
         run: |
-          python scripts/export_stock_snapshots.py --all-stocks --output public/data/snapshots/stocks --limit-history 2600
+          python scripts/export_stock_snapshots.py --all-assets --output public/data/snapshots/stocks --limit-history 2600
 
       - name: Validar snapshot de ações
         if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.publicar_snapshot == 'sim' }}

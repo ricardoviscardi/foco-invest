@@ -24,6 +24,14 @@ function cleanTicker(value: string): string {
   return value.trim().replace(/\s+/g, "").toLowerCase();
 }
 
+function completeCommonB3Ticker(value: string): string {
+  const normalized = value.trim().replace(/\s+/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (/^[A-Z]{4}$/.test(normalized)) {
+    return `${normalized}3`;
+  }
+  return normalized;
+}
+
 export function StockAutocomplete({
   placeholder = "Pesquisar ticker",
   showButton = false,
@@ -78,7 +86,7 @@ export function StockAutocomplete({
   }, [normalizedQuery]);
 
   function goToTicker(ticker: string) {
-    const normalizedTicker = cleanTicker(ticker);
+    const normalizedTicker = cleanTicker(completeCommonB3Ticker(ticker));
     if (!normalizedTicker) return;
 
     router.push(`/acoes/${normalizedTicker}`);
